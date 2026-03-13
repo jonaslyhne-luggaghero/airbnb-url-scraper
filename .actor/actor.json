@@ -1,0 +1,7 @@
+{
+    "actorSpecification": 1,
+    "name": "airbnb-url-scraper",
+    "title": "Airbnb URL Scraper",
+    "version": "1.0",
+    "input": "./input_schema.json"
+}
