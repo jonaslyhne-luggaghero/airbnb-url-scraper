@@ -1,1 +1,21 @@
-
+{
+    "title": "Airbnb URL Scraper Input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "city": {
+            "title": "City",
+            "type": "string",
+            "description": "City name to search",
+            "editor": "textfield"
+        },
+        "maxListings": {
+            "title": "Max Listings",
+            "type": "integer",
+            "description": "Maximum number of listing URLs to return",
+            "default": 100,
+            "editor": "number"
+        }
+    },
+    "required": ["city"]
+}
