@@ -32,7 +32,6 @@ const CITIES = {
     'Edinburgh':    { ne_lat: 55.970, ne_lng: -3.160, sw_lat: 55.930, sw_lng: -3.220 },
     'Krakow':       { ne_lat: 50.080, ne_lng: 19.970, sw_lat: 50.040, sw_lng: 19.910 },
     'Lyon':         { ne_lat: 45.780, ne_lng: 4.870,  sw_lat: 45.740, sw_lng: 4.810  },
-    'Lisbon':       { ne_lat: 38.740, ne_lng: -9.120, sw_lat: 38.700, sw_lng: -9.170 },
     'Zagreb':       { ne_lat: 45.840, ne_lng: 16.020, sw_lat: 45.800, sw_lng: 15.960 },
     'Ljubljana':    { ne_lat: 46.080, ne_lng: 14.530, sw_lat: 46.040, sw_lng: 14.470 },
     'Riga':         { ne_lat: 56.970, ne_lng: 24.140, sw_lat: 56.930, sw_lng: 24.080 },
@@ -62,75 +61,52 @@ while (allListings.length < maxListings) {
     const html = await res.text();
     console.log(`Page size: ${html.length} characters`);
 
-    // ── STEP 1: Extract all valid room IDs ──────────────────
-    // Only match IDs that appear inside proper /rooms/ paths — this avoids fake sequential IDs
-    const roomIdMatches = [...html.matchAll(/\/rooms\/(\d{7,})/g)];
-    const pageIds = [...new Set(roomIdMatches.map(m => m[1]))];
+    // ── STEP 1: Extract room IDs (proven working method) ───
+    // Match any /rooms/XXXXXXX pattern — this is what worked before
+    const allIdMatches = [...html.matchAll(/\/rooms\/(\d+)/g)];
+    const pageIds = [...new Set(allIdMatches.map(m => m[1]))];
+    console.log(`Found ${pageIds.length} raw IDs`);
 
-    // Filter out IDs that are clearly sequential/fake (differ by less than 100 from each other)
-    const sortedIds = [...pageIds].sort((a, b) => Number(a) - Number(b));
-    const validIds = [];
-    for (let i = 0; i < sortedIds.length; i++) {
-        const id = sortedIds[i];
-        const prev = sortedIds[i - 1];
-        // Skip if this ID is suspiciously close to the previous one (sequential fake IDs)
-        if (prev && Math.abs(Number(id) - Number(prev)) < 50) continue;
-        validIds.push(id);
-    }
-
-    console.log(`Found ${pageIds.length} raw IDs, ${validIds.length} valid after filtering`);
-
-    // ── STEP 2: Check which IDs are business hosts ──────────
-    // Find all listing JSON blocks and check for business host signals near the ID
+    // ── STEP 2: Detect business hosts from search HTML ─────
+    // Scan for "Business host" label near each room ID
     const businessIds = new Set();
 
-    // Method A: find "Business host" text near a room ID in the same JSON chunk
-    // Split on listing boundaries and check each chunk
-    const chunks = html.split('"url":"/rooms/');
-    for (const chunk of chunks.slice(1)) {
-        const idMatch = chunk.match(/^(\d{6,})/);
-        if (!idMatch) continue;
-        const id = idMatch[1];
-        // Look at the surrounding 3000 chars for business signals
-        const context = chunk.substring(0, 3000);
+    for (const id of pageIds) {
+        // Find where this ID appears in the HTML
+        const idIndex = html.indexOf(`/rooms/${id}`);
+        if (idIndex === -1) continue;
+
+        // Check 3000 chars around the ID for business signals
+        const start = Math.max(0, idIndex - 1500);
+        const end = Math.min(html.length, idIndex + 1500);
+        const context = html.substring(start, end);
+
         if (
-            context.includes('"Business host"') ||
-            context.includes('"businessHost"') ||
             context.includes('Business host') ||
-            context.includes('"is_business_travel_ready":true') ||
+            context.includes('"businessHost"') ||
+            context.includes('"is_business_host":true') ||
             context.includes('prohost-api') ||
-            context.includes('"hostType":"PROFESSIONAL"') ||
-            context.includes('"isProfessionalHost":true')
+            context.includes('"isProfessionalHost":true') ||
+            context.includes('"hostType":"PROFESSIONAL"')
         ) {
             businessIds.add(id);
-            console.log(`  → Business host detected for room ${id}`);
         }
     }
 
-    // Method B: search the raw HTML for "Business host" and find nearby room IDs
-    const businessHostRegex = /Business host/g;
-    let bMatch;
-    while ((bMatch = businessHostRegex.exec(html)) !== null) {
-        // Look backwards up to 2000 chars for a room ID
-        const before = html.substring(Math.max(0, bMatch.index - 2000), bMatch.index);
-        const idInBefore = [...before.matchAll(/\/rooms\/(\d{7,})/g)];
-        if (idInBefore.length > 0) {
-            const closestId = idInBefore[idInBefore.length - 1][1]; // last = closest
-            businessIds.add(closestId);
-            console.log(`  → Business host (method B) detected for room ${closestId}`);
-        }
-    }
+    console.log(`Business hosts detected on this page: ${businessIds.size}`);
 
-    console.log(`Business hosts on this page: ${businessIds.size}`);
-
-    // ── STEP 3: Add new listings ────────────────────────────
+    // ── STEP 3: Add new listings ───────────────────────────
     let newCount = 0;
-    for (const id of validIds) {
+    for (const id of pageIds) {
         if (!seenIds.has(id) && allListings.length < maxListings) {
             seenIds.add(id);
+            const isBusinessHostFromSearch = businessIds.has(id);
+            if (isBusinessHostFromSearch) {
+                console.log(`  ✅ Business host: https://www.airbnb.com/rooms/${id}`);
+            }
             allListings.push({
                 url: `https://www.airbnb.com/rooms/${id}`,
-                isBusinessHostFromSearch: businessIds.has(id),
+                isBusinessHostFromSearch,
             });
             newCount++;
         }
@@ -148,7 +124,7 @@ while (allListings.length < maxListings) {
 }
 
 const businessCount = allListings.filter(l => l.isBusinessHostFromSearch).length;
-console.log(`\nTotal: ${allListings.length} listings, ${businessCount} flagged as business hosts from search page`);
+console.log(`\nTotal: ${allListings.length} listings, ${businessCount} flagged as business hosts`);
 
 for (const listing of allListings) {
     await Actor.pushData(listing);
