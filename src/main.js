@@ -53,35 +53,59 @@ const key = city.toLowerCase().trim();
 const coords = CITIES[key];
 
 if (!coords) {
-    console.log(`City "${city}" not found. Available cities: ${Object.keys(CITIES).join(', ')}`);
+    console.log(`City "${city}" not found.`);
     await Actor.exit();
 }
 
 console.log(`Searching Airbnb listings in ${city}...`);
 
-// Call Airbnb's internal search API using the bounding box
-const url = `https://www.airbnb.com/api/v3/StaysSearch?operationName=StaysSearch&locale=en&currency=EUR`;
+// Use Airbnb's search URL with bounding box
+const searchUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
 
-const searchUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12&search_type=AUTOSUGGEST`;
+console.log(`Fetching: ${searchUrl}`);
 
-// Fetch the search page and extract listing IDs
 const response = await fetch(searchUrl, {
     headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
     }
 });
 
 const html = await response.text();
+console.log(`Page size: ${html.length} characters`);
 
-// Extract room IDs from the page
-const roomIdMatches = [...html.matchAll(/"id"\s*:\s*"(\d{10,})"/g)];
-const uniqueIds = [...new Set(roomIdMatches.map(m => m[1]))].slice(0, maxListings);
+// Extract real listing IDs — Airbnb room IDs are typically 8-19 digits
+// Look for them in the JSON data embedded in the page
+const patterns = [
+    /\/rooms\/(\d{8,19})/g,                          // /rooms/12345678
+    /"listingId"\s*:\s*"(\d{8,19})"/g,               // "listingId":"12345678"
+    /"id"\s*:\s*"(\d{8,19})"\s*,\s*"__typename"\s*:\s*"Listing"/g,  // Listing type
+    /listing_id=(\d{8,19})/g,                         // listing_id=12345678
+];
 
-console.log(`Found ${uniqueIds.length} listing IDs`);
+const found = new Set();
 
-const results = uniqueIds.map(id => ({
+for (const pattern of patterns) {
+    const matches = [...html.matchAll(pattern)];
+    for (const m of matches) {
+        found.add(m[1]);
+        if (found.size >= maxListings) break;
+    }
+    if (found.size >= maxListings) break;
+}
+
+const ids = [...found].slice(0, maxListings);
+console.log(`Found ${ids.length} valid listing IDs`);
+
+if (ids.length === 0) {
+    console.log('No listing IDs found. The page may be blocked or structured differently.');
+    console.log('First 500 chars of page:', html.substring(0, 500));
+}
+
+const results = ids.map(id => ({
     id,
     url: `https://www.airbnb.com/rooms/${id}`,
     city,
