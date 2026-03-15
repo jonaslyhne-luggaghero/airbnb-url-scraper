@@ -73,11 +73,21 @@ while (keepGoing && allListings.length < maxListings) {
             },
         },
         requestHandler: async ({ page }) => {
-            // Wait for listing cards to actually appear
-            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
-            await page.waitForTimeout(3000); // let remaining cards load
-            pageHtml = await page.evaluate(() => document.body.innerHTML || '');
+            await page.waitForLoadState('domcontentloaded');
+            await page.waitForTimeout(5000);
+
+            // Get full page source INCLUDING script tags (where Next.js embeds listing data)
+            pageHtml = await page.evaluate(() => document.documentElement.innerHTML || '');
             pageText = await page.evaluate(() => document.body.innerText || '');
+
+            // Log a sample to debug what's in the page
+            const sample = pageHtml.substring(0, 500);
+            console.log(`Page sample: ${sample}`);
+
+            // Also check if __NEXT_DATA__ exists
+            const hasNextData = pageHtml.includes('__NEXT_DATA__');
+            const hasRooms = pageHtml.includes('/rooms/');
+            console.log(`Has __NEXT_DATA__: ${hasNextData}, Has /rooms/: ${hasRooms}`);
         },
     });
 
