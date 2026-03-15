@@ -3,7 +3,6 @@
   "name": "airbnb-url-scraper",
   "title": "Airbnb URL Scraper",
   "version": "0.0",
-  "buildTag": "latest",
-  "dockerImage": "apify/actor-node-playwright-chrome:20",
+  "dockerfile": "../Dockerfile",
   "input": "./input_schema.json"
 }
