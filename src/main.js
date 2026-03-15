@@ -73,7 +73,9 @@ while (keepGoing && allListings.length < maxListings) {
             },
         },
         requestHandler: async ({ page }) => {
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            // Wait for listing cards to actually appear
+            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
+            await page.waitForTimeout(3000); // let remaining cards load
             pageHtml = await page.evaluate(() => document.body.innerHTML || '');
             pageText = await page.evaluate(() => document.body.innerText || '');
         },
