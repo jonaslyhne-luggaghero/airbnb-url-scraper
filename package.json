@@ -1,14 +1,15 @@
 {
-    "name": "airbnb-url-scraper",
-    "version": "1.0.0",
-    "type": "module",
-    "description": "Scrapes Airbnb listing URLs by city bounding box",
-    "main": "src/main.js",
-    "scripts": {
-        "start": "node src/main.js"
-    },
-    "dependencies": {
-        "apify": "^3.0.0",
-        "crawlee": "^3.0.0"
-    }
+  "name": "airbnb-url-scraper",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Scrapes Airbnb listing URLs and detects business hosts",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "apify": "^3.0.0",
+    "@crawlee/playwright": "^3.0.0",
+    "playwright": "^1.40.0"
+  }
 }
