@@ -87,7 +87,7 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
 });
 
 const seenUrls = new Set();
-const seenCompanies = new Set(); // prevent duplicate company names
+const seenCompanies = new Set();
 
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
@@ -110,8 +110,8 @@ const crawler = new PlaywrightCrawler({
             console.log(`  URL: ${page.url().substring(0, 150)}`);
 
             // Wait for listing cards to render
-            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
-            await sleep(4000);
+            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 }).catch(() => {});
+            await sleep(8000);
 
             // Find all "Business host" listing URLs on this page
             const businessListingUrls = await page.evaluate(() => {
@@ -140,11 +140,11 @@ const crawler = new PlaywrightCrawler({
             console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
             if (newUrls.length === 0 && pageNum > 2) {
-                console.log('  No new business hosts on this page — stopping.');
+                console.log('  No new business hosts — stopping.');
                 break;
             }
 
-            // Open each listing in a new tab
+            // Open each listing in a new tab — search page stays open
             for (const listingUrl of newUrls) {
                 seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
@@ -192,7 +192,6 @@ const crawler = new PlaywrightCrawler({
                         else if (label === 'address' || label === 'adresse') address = value;
                     }
 
-                    // Get rating and reviews — check multiple patterns
                     const pageText = await tab.evaluate(() => document.body.innerText || '');
                     const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*[\d,]+\s*review/i)
                         || pageText.match(/Rated\s+([\d.]+)\s+out of 5/i)
@@ -210,6 +209,8 @@ const crawler = new PlaywrightCrawler({
                             address, registrationNumber, starRating, reviewCount,
                             isBusinessHost: true, scrapedAt: new Date().toISOString(),
                         });
+                    } else if (companyName || email || phone) {
+                        console.log(`    ⏭️ Duplicate: ${companyName || email}`);
                     } else {
                         console.log(`    ⚠️ No details extracted`);
                     }
@@ -220,29 +221,20 @@ const crawler = new PlaywrightCrawler({
                 }
             }
 
-            // ── PAGINATION: click page number link directly ──────
+            // Pagination
             console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
 
             const navLinks = await page.$$('nav a[href]');
             let nextLink = null;
-
             for (const link of navLinks) {
                 const text = await link.textContent();
-                if (text?.trim() === String(pageNum + 1)) {
-                    nextLink = link;
-                    break;
-                }
+                if (text?.trim() === String(pageNum + 1)) { nextLink = link; break; }
             }
-            if (!nextLink && navLinks.length > 0) {
-                nextLink = navLinks[navLinks.length - 1];
-            }
+            if (!nextLink && navLinks.length > 0) nextLink = navLinks[navLinks.length - 1];
 
-            if (!nextLink) {
-                console.log('  No next page link — done.');
-                break;
-            }
+            if (!nextLink) { console.log('  No next page — done.'); break; }
 
             const linkText = await nextLink.textContent();
             console.log(`  Clicking: "${linkText?.trim()}"`);
@@ -267,10 +259,7 @@ const crawler = new PlaywrightCrawler({
                     break;
                 }
             }
-            if (!changed) {
-                console.log('  Page did not change — done.');
-                break;
-            }
+            if (!changed) { console.log('  Page did not change — done.'); break; }
             await sleep(3000);
         }
 
