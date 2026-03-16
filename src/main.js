@@ -152,6 +152,12 @@ const crawler = new PlaywrightCrawler({
                     await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
                     await sleep(6000);
 
+                    // Debug: log what the tab actually loaded
+                    const tabTitle = await tab.title();
+                    const tabText = await tab.evaluate(() => document.body.innerText?.substring(0, 300) || '');
+                    console.log(`    Tab title: ${tabTitle}`);
+                    console.log(`    Tab text sample: ${tabText.substring(0, 150)}`);
+
                     // Find modal text
                     let modalText = '';
                     const selectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
