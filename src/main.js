@@ -74,19 +74,39 @@ const crawler = new PlaywrightCrawler({
             await page.waitForLoadState('domcontentloaded');
             await sleep(5000);
 
+            // ── Debug: check what's on the page ──────────────────
+            const debugInfo = await page.evaluate(() => {
+                const allText = document.body.innerText || '';
+                const hasBusinessHost = allText.includes('Business host');
+                const roomLinks = [...document.querySelectorAll('a[href*="/rooms/"]')].length;
+                // Find elements containing "Business host" text
+                const allEls = [...document.querySelectorAll('*')];
+                const businessEls = allEls
+                    .filter(el => el.childNodes.length === 1 && el.textContent?.trim() === 'Business host')
+                    .map(el => el.tagName + '.' + el.className.split(' ')[0]);
+                return { hasBusinessHost, roomLinks, businessEls: businessEls.slice(0, 10), textSample: allText.substring(0, 300) };
+            });
+            console.log('  Debug:', JSON.stringify(debugInfo));
+
             // ── Find all listing cards that say "Business host" ──
             const businessListingUrls = await page.evaluate(() => {
                 const results = [];
-                // Each listing card is an <a> tag containing listing info
-                const cards = document.querySelectorAll('a[href*="/rooms/"]');
-                for (const card of cards) {
-                    const text = card.innerText || card.textContent || '';
-                    if (text.includes('Business host')) {
-                        const href = card.getAttribute('href');
-                        if (href && href.includes('/rooms/')) {
-                            const url = href.startsWith('http') ? href : `https://www.airbnb.com${href}`;
-                            // Remove query params to get clean URL
-                            results.push(url.split('?')[0]);
+                // Find all elements whose text is exactly "Business host"
+                const allEls = [...document.querySelectorAll('*')];
+                for (const el of allEls) {
+                    if (el.textContent?.trim() === 'Business host') {
+                        // Walk up to find the closest parent with a /rooms/ link
+                        let parent = el.parentElement;
+                        for (let i = 0; i < 15; i++) {
+                            if (!parent) break;
+                            const link = parent.querySelector('a[href*="/rooms/"]');
+                            if (link) {
+                                const href = link.getAttribute('href');
+                                const url = href.startsWith('http') ? href : `https://www.airbnb.com${href}`;
+                                results.push(url.split('?')[0]);
+                                break;
+                            }
+                            parent = parent.parentElement;
                         }
                     }
                 }
