@@ -43,92 +43,110 @@ const CITIES = {
 };
 
 const coords = CITIES[city] || CITIES['Copenhagen'];
+const startUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=14`;
+
 console.log(`Searching Airbnb listings in ${city} (max ${maxListings})...`);
 
 const seenIds = new Set();
 const allListings = [];
-const totalPages = Math.ceil(maxListings / 18);
 
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
     countryCode: 'IE',
 });
 
-// Each page gets its own crawler = fresh browser + fresh proxy session
-for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
-    const offset = i * 18;
-    const url = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=14&items_offset=${offset}&section_offset=3`;
-
-    console.log(`\nFetching page ${i + 1} (offset ${offset})...`);
-
-    let pageHtml = '';
-
-    const crawler = new PlaywrightCrawler({
-        proxyConfiguration,
-        headless: true,
-        navigationTimeoutSecs: 90,
-        requestHandlerTimeoutSecs: 120,
-        maxConcurrency: 1,
-        maxRequestRetries: 2,
-        useSessionPool: false,
-        launchContext: {
-            launchOptions: {
-                args: ['--disable-gpu', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
-            },
+const crawler = new PlaywrightCrawler({
+    proxyConfiguration,
+    headless: true,
+    navigationTimeoutSecs: 90,
+    requestHandlerTimeoutSecs: 300,
+    maxConcurrency: 1,
+    maxRequestRetries: 2,
+    launchContext: {
+        launchOptions: {
+            args: ['--disable-gpu', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
         },
-        requestHandler: async ({ page }) => {
+    },
+    requestHandler: async ({ page }) => {
+        let pageNum = 0;
+
+        while (allListings.length < maxListings) {
+            pageNum++;
+            console.log(`\nPage ${pageNum} — waiting for listings to load...`);
+
+            // Wait for listing cards to appear
             await page.waitForLoadState('domcontentloaded');
-            await sleep(8000);
-            pageHtml = await page.evaluate(() => document.documentElement.innerHTML || '');
+            await sleep(6000);
+
+            const pageHtml = await page.evaluate(() => document.documentElement.innerHTML || '');
             console.log(`  HTML size: ${pageHtml.length}`);
-        },
-    });
 
-    await crawler.run([{ url }]);
+            if (pageHtml.length < 200000) {
+                console.log('  Page too small — stopping');
+                break;
+            }
 
-    if (pageHtml.length < 200000) {
-        console.log(`  Page too small (${pageHtml.length} chars) — likely bot detection, skipping`);
-        continue;
-    }
+            // Extract room IDs
+            const pageIds = [...new Set([...pageHtml.matchAll(/\/rooms\/(\d+)/g)].map(m => m[1]))];
+            console.log(`  Found ${pageIds.length} IDs`);
 
-    // Extract room IDs
-    const pageIds = [...new Set([...pageHtml.matchAll(/\/rooms\/(\d+)/g)].map(m => m[1]))];
-    console.log(`  Found ${pageIds.length} IDs`);
+            // Detect business hosts
+            const businessIds = new Set();
+            for (const id of pageIds) {
+                const idx = pageHtml.indexOf(`/rooms/${id}`);
+                if (idx === -1) continue;
+                const ctx = pageHtml.substring(Math.max(0, idx - 2000), Math.min(pageHtml.length, idx + 2000));
+                if (
+                    ctx.includes('Business host') ||
+                    ctx.includes('"businessHost"') ||
+                    ctx.includes('prohost-api') ||
+                    ctx.includes('"isProfessionalHost":true') ||
+                    ctx.includes('"hostType":"PROFESSIONAL"')
+                ) {
+                    businessIds.add(id);
+                    console.log(`  ✅ Business host: /rooms/${id}`);
+                }
+            }
+            console.log(`  Business hosts: ${businessIds.size}`);
 
-    // Detect business hosts
-    const businessIds = new Set();
-    for (const id of pageIds) {
-        const idx = pageHtml.indexOf(`/rooms/${id}`);
-        if (idx === -1) continue;
-        const ctx = pageHtml.substring(Math.max(0, idx - 2000), Math.min(pageHtml.length, idx + 2000));
-        if (
-            ctx.includes('Business host') ||
-            ctx.includes('"businessHost"') ||
-            ctx.includes('prohost-api') ||
-            ctx.includes('"isProfessionalHost":true') ||
-            ctx.includes('"hostType":"PROFESSIONAL"')
-        ) {
-            businessIds.add(id);
-            console.log(`  ✅ Business host: /rooms/${id}`);
+            // Add new listings
+            let newCount = 0;
+            for (const id of pageIds) {
+                if (!seenIds.has(id) && allListings.length < maxListings) {
+                    seenIds.add(id);
+                    allListings.push({
+                        url: `https://www.airbnb.com/rooms/${id}`,
+                        isBusinessHostFromSearch: businessIds.has(id),
+                    });
+                    newCount++;
+                }
+            }
+            console.log(`  New: ${newCount}, Total: ${allListings.length}`);
+
+            if (allListings.length >= maxListings) {
+                console.log('  Reached max listings, stopping.');
+                break;
+            }
+
+            // ── CLICK NEXT PAGE like a real user ──────────────
+            // Try to find and click the "next" pagination button
+            const nextBtn = await page.$('a[aria-label="Next"], button[aria-label="Next"], [data-testid="pagination-next"]');
+            if (!nextBtn) {
+                console.log('  No next page button found — reached last page.');
+                break;
+            }
+
+            console.log('  Clicking next page...');
+            await nextBtn.click();
+
+            // Wait for new page content to load
+            await page.waitForLoadState('domcontentloaded');
+            await sleep(5000);
         }
-    }
-    console.log(`  Business hosts on this page: ${businessIds.size}`);
+    },
+});
 
-    let newCount = 0;
-    for (const id of pageIds) {
-        if (!seenIds.has(id) && allListings.length < maxListings) {
-            seenIds.add(id);
-            allListings.push({
-                url: `https://www.airbnb.com/rooms/${id}`,
-                isBusinessHostFromSearch: businessIds.has(id),
-            });
-            newCount++;
-        }
-    }
-    console.log(`  New: ${newCount}, Total: ${allListings.length}`);
-
-    if (i < totalPages - 1) await sleep(3000);
-}
+await crawler.run([{ url: startUrl }]);
 
 const businessCount = allListings.filter(l => l.isBusinessHostFromSearch).length;
 console.log(`\nTotal: ${allListings.length} listings, ${businessCount} flagged as business hosts`);
