@@ -236,6 +236,10 @@ const crawler = new PlaywrightCrawler({
             console.log('  Clicking next page...');
             const currentPageUrl = page.url();
 
+            // Scroll to bottom to ensure pagination is rendered
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await sleep(2000);
+
             // Get the next page URL directly from the nav link's href
             const nextPageUrl = await page.evaluate(() => {
                 const nav = document.querySelector('nav');
@@ -252,13 +256,27 @@ const crawler = new PlaywrightCrawler({
             });
 
             if (!nextPageUrl) {
-                console.log('  No next page link found — done.');
-                break;
+                // Fallback: try clicking the last nav button
+                const clicked = await page.evaluate(() => {
+                    const nav = document.querySelector('nav');
+                    if (!nav) return false;
+                    const btns = [...nav.querySelectorAll('a, button')];
+                    const last = btns[btns.length - 1];
+                    if (!last || last.getAttribute('aria-disabled') === 'true') return false;
+                    last.click();
+                    return true;
+                });
+                if (!clicked) {
+                    console.log('  No more pages.');
+                    break;
+                }
+                console.log('  Clicked next button (fallback)');
+                await sleep(6000);
+            } else {
+                console.log(`  Navigating to: ${nextPageUrl.substring(0, 100)}`);
+                await page.goto(nextPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+                await sleep(3000);
             }
-
-            console.log(`  Navigating to next page: ${nextPageUrl.substring(0, 120)}`);
-            await page.goto(nextPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            await sleep(5000);
         }
 
         console.log('\nDone!');
