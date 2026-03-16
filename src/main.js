@@ -109,7 +109,9 @@ const crawler = new PlaywrightCrawler({
             console.log(`  URL: ${page.url().substring(0, 200)}`);
 
             await page.waitForLoadState('domcontentloaded');
-            await sleep(5000);
+            // Wait for listing cards to actually render
+            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
+            await sleep(4000);
 
             // Find all "Business host" listing URLs on this page
             const businessListingUrls = await page.evaluate(() => {
