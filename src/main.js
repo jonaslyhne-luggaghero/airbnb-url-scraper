@@ -42,15 +42,42 @@ const CITIES = {
     'Vilnius':      { ne_lat: 54.740, ne_lng: 25.350, sw_lat: 54.640, sw_lng: 25.210 },
 };
 
-const coords = CITIES[city] || CITIES['Copenhagen'];
-// Add date range ~30 days from now so pagination works correctly
-const checkIn = new Date();
-checkIn.setDate(checkIn.getDate() + 30);
-const checkOut = new Date(checkIn);
-checkOut.setDate(checkOut.getDate() + 7);
-const fmt = d => d.toISOString().split('T')[0];
+const CITY_URLS = {
+    'Copenhagen':  'Copenhagen--Denmark',
+    'Paris':       'Paris--France',
+    'Amsterdam':   'Amsterdam--Netherlands',
+    'Berlin':      'Berlin--Germany',
+    'Barcelona':   'Barcelona--Spain',
+    'Madrid':      'Madrid--Spain',
+    'Rome':        'Rome--Italy',
+    'Vienna':      'Vienna--Austria',
+    'Prague':      'Prague--Czech-Republic',
+    'Lisbon':      'Lisbon--Portugal',
+    'Brussels':    'Brussels--Belgium',
+    'Stockholm':   'Stockholm--Sweden',
+    'Oslo':        'Oslo--Norway',
+    'Helsinki':    'Helsinki--Finland',
+    'Munich':      'Munich--Germany',
+    'Hamburg':     'Hamburg--Germany',
+    'Warsaw':      'Warsaw--Poland',
+    'Budapest':    'Budapest--Hungary',
+    'Athens':      'Athens--Greece',
+    'Milan':       'Milan--Italy',
+    'Zurich':      'Zurich--Switzerland',
+    'Dublin':      'Dublin--Ireland',
+    'Edinburgh':   'Edinburgh--United-Kingdom',
+    'Krakow':      'Krakow--Poland',
+    'Lyon':        'Lyon--France',
+    'Zagreb':      'Zagreb--Croatia',
+    'Ljubljana':   'Ljubljana--Slovenia',
+    'Riga':        'Riga--Latvia',
+    'Tallinn':     'Tallinn--Estonia',
+    'Vilnius':     'Vilnius--Lithuania',
+};
 
-const startUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12&checkin=${fmt(checkIn)}&checkout=${fmt(checkOut)}`;
+const coords = CITIES[city] || CITIES['Copenhagen'];
+const citySlug = CITY_URLS[city] || encodeURIComponent(city);
+const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
 
 console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
@@ -73,12 +100,13 @@ const crawler = new PlaywrightCrawler({
             args: ['--disable-gpu', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
         },
     },
-    requestHandler: async ({ page, browserController }) => {
+    requestHandler: async ({ page }) => {
         let pageNum = 0;
 
         while (pageNum < maxPages) {
             pageNum++;
             console.log(`\n--- Page ${pageNum} ---`);
+            console.log(`  URL: ${page.url().substring(0, 120)}`);
 
             await page.waitForLoadState('domcontentloaded');
             await sleep(5000);
@@ -109,19 +137,18 @@ const crawler = new PlaywrightCrawler({
             const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
             console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
-            // ── Open each listing in a NEW TAB — search page stays open ──
+            // Open each listing in a new tab — search page stays open
             for (const listingUrl of newUrls) {
                 seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
 
-                // Open new tab
                 const context = page.context();
                 const tab = await context.newPage();
 
                 try {
                     const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
                     await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                    await sleep(6000); // increased from 4s to 6s
+                    await sleep(6000);
 
                     // Find modal text
                     let modalText = '';
@@ -159,7 +186,7 @@ const crawler = new PlaywrightCrawler({
                         else if (label === 'address' || label === 'adresse') address = value;
                     }
 
-                    // Get rating and reviews from page text
+                    // Get rating and reviews
                     const pageText = await tab.evaluate(() => document.body.innerText || '');
                     const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*\d+\s*review/i);
                     const starRating = ratingMatch ? parseFloat(ratingMatch[1]) : null;
@@ -187,12 +214,14 @@ const crawler = new PlaywrightCrawler({
                 } catch (err) {
                     console.log(`    ❌ Error: ${err.message}`);
                 } finally {
-                    await tab.close(); // Always close the tab
+                    await tab.close();
                 }
             }
 
-            // ── Click next page — we never left the search page ──
+            // Click next page
             console.log('  Clicking next page...');
+            const currentPageUrl = page.url();
+
             const clicked = await page.evaluate(() => {
                 const nav = document.querySelector('nav');
                 if (!nav) return false;
@@ -208,7 +237,19 @@ const crawler = new PlaywrightCrawler({
                 break;
             }
 
-            await sleep(6000);
+            // Wait for URL to change — confirms new page loaded
+            try {
+                await page.waitForFunction(
+                    (oldUrl) => window.location.href !== oldUrl,
+                    currentPageUrl,
+                    { timeout: 15000 }
+                );
+            } catch (e) {
+                console.log('  URL did not change after click');
+            }
+
+            await page.waitForLoadState('domcontentloaded');
+            await sleep(5000);
         }
 
         console.log('\nDone!');
