@@ -87,6 +87,7 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
 });
 
 const seenUrls = new Set();
+const seenCompanies = new Set(); // prevent duplicate company names
 
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
@@ -197,7 +198,8 @@ const crawler = new PlaywrightCrawler({
                     const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*(\d[\d,]+)\s*review/i);
                     const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/,/g, '')) : null;
 
-                    if (companyName || email || phone) {
+                    if ((companyName || email || phone) && !seenCompanies.has(email || companyName)) {
+                        seenCompanies.add(email || companyName);
                         console.log(`    ✅ ${companyName} | ${email} | ${phone}`);
                         await Actor.pushData({
                             url: listingUrl, city, companyName, email, phone,
