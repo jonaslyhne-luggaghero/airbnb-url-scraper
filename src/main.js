@@ -154,8 +154,10 @@ const crawler = new PlaywrightCrawler({
                 try {
                     const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                    await sleep(6000);
+                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+                    // Wait for modal to appear
+                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 15000 }).catch(() => {});
+                    await sleep(2000);
 
                     // Find modal text
                     let modalText = '';
@@ -229,6 +231,14 @@ const crawler = new PlaywrightCrawler({
             console.log('  Clicking next page...');
             const currentPageUrl = page.url();
 
+            // Get current listing IDs to detect when page content changes
+            const getCurrentIds = () => page.evaluate(() => {
+                const links = [...document.querySelectorAll('a[href*="/rooms/"]')];
+                return links.slice(0, 3).map(l => l.href).join(',');
+            });
+
+            const idsBefore = await getCurrentIds();
+
             const clicked = await page.evaluate(() => {
                 const nav = document.querySelector('nav');
                 if (!nav) return false;
@@ -244,20 +254,21 @@ const crawler = new PlaywrightCrawler({
                 break;
             }
 
-            try {
-                await page.waitForFunction(
-                    (oldUrl) => window.location.href !== oldUrl,
-                    currentPageUrl,
-                    { timeout: 15000 }
-                );
-                console.log(`  New URL: ${page.url().substring(0, 120)}`);
-            } catch (e) {
-                console.log('  Waiting for page content to update...');
-                await sleep(8000);
+            // Wait for listing content to actually change
+            let contentChanged = false;
+            for (let i = 0; i < 15; i++) {
+                await sleep(1000);
+                const idsAfter = await getCurrentIds();
+                if (idsAfter !== idsBefore) {
+                    contentChanged = true;
+                    console.log('  Page content changed ✅');
+                    break;
+                }
             }
-
-            await page.waitForLoadState('domcontentloaded');
-            await sleep(5000);
+            if (!contentChanged) {
+                console.log('  Content did not change after 15s — may be last page');
+            }
+            await sleep(3000);
         }
 
         console.log('\nDone!');
