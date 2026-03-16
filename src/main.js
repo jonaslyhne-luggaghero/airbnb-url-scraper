@@ -106,10 +106,9 @@ const crawler = new PlaywrightCrawler({
         while (pageNum < maxPages) {
             pageNum++;
             console.log(`\n--- Page ${pageNum} ---`);
-            console.log(`  URL: ${page.url().substring(0, 200)}`);
+            console.log(`  URL: ${page.url().substring(0, 150)}`);
 
-            await page.waitForLoadState('domcontentloaded');
-            // Wait for listing cards to actually render
+            // Wait for listing cards to render
             await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
             await sleep(4000);
 
@@ -139,13 +138,12 @@ const crawler = new PlaywrightCrawler({
             const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
             console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
-            // Stop if no new results found
             if (newUrls.length === 0 && pageNum > 1) {
                 console.log('  No new business hosts — stopping.');
                 break;
             }
 
-            // Open each listing in a new tab — search page stays open
+            // Open each listing in a new tab
             for (const listingUrl of newUrls) {
                 seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
@@ -160,31 +158,25 @@ const crawler = new PlaywrightCrawler({
                     await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 15000 }).catch(() => {});
                     await sleep(2000);
 
-                    // Log what we got for debugging
                     const tabTitle = await tab.title();
                     console.log(`    Tab: ${tabTitle.substring(0, 60)}`);
 
-                    // Find modal text
                     let modalText = '';
                     const selectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
                     for (const sel of selectors) {
                         try {
-                            await tab.waitForSelector(sel, { timeout: 5000 });
                             const el = await tab.$(sel);
                             if (el) {
                                 modalText = await tab.evaluate(el => el.innerText || '', el);
                                 if (modalText.length > 50) break;
                             }
-                        } catch (e) { /* try next */ }
+                        } catch (e) {}
                     }
                     if (!modalText || modalText.length < 50) {
                         modalText = await tab.evaluate(() => document.body.innerText || '');
                     }
 
-                    // Parse modal fields
-                    let companyName = null, email = null, phone = null;
-                    let address = null, registrationNumber = null;
-
+                    let companyName = null, email = null, phone = null, address = null, registrationNumber = null;
                     const lines = modalText.split('\n').map(l => l.trim()).filter(Boolean);
                     for (const line of lines) {
                         const colonIdx = line.indexOf(':');
@@ -192,7 +184,6 @@ const crawler = new PlaywrightCrawler({
                         const label = line.substring(0, colonIdx).trim().toLowerCase();
                         const value = line.substring(colonIdx + 1).trim();
                         if (!value) continue;
-
                         if (label.includes('business name') || label.includes('company') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
                         else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat') || label.includes('siren') || label.includes('siret')) registrationNumber = value;
                         else if (label.includes('email') || label === 'e-mail' || label === 'courriel') email = value;
@@ -200,7 +191,6 @@ const crawler = new PlaywrightCrawler({
                         else if (label === 'address' || label === 'adresse') address = value;
                     }
 
-                    // Get rating and reviews
                     const pageText = await tab.evaluate(() => document.body.innerText || '');
                     const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*\d+\s*review/i);
                     const starRating = ratingMatch ? parseFloat(ratingMatch[1]) : null;
@@ -210,17 +200,9 @@ const crawler = new PlaywrightCrawler({
                     if (companyName || email || phone) {
                         console.log(`    ✅ ${companyName} | ${email} | ${phone}`);
                         await Actor.pushData({
-                            url: listingUrl,
-                            city,
-                            companyName,
-                            email,
-                            phone,
-                            address,
-                            registrationNumber,
-                            starRating,
-                            reviewCount,
-                            isBusinessHost: true,
-                            scrapedAt: new Date().toISOString(),
+                            url: listingUrl, city, companyName, email, phone,
+                            address, registrationNumber, starRating, reviewCount,
+                            isBusinessHost: true, scrapedAt: new Date().toISOString(),
                         });
                     } else {
                         console.log(`    ⚠️ No details extracted`);
@@ -232,78 +214,58 @@ const crawler = new PlaywrightCrawler({
                 }
             }
 
-            // Click next page
-            console.log('  Clicking next page...');
-            const currentPageUrl = page.url();
-
-            // Scroll to bottom to ensure pagination is rendered
+            // ── PAGINATION: click page number link directly ──────
+            console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
-            // Scroll back up slightly so pagination nav is visible
-            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight - 500));
-            await sleep(1000);
 
-            // Get the next page URL directly from the nav link's href
-            const nextPageUrl = await page.evaluate(() => {
-                const nav = document.querySelector('nav');
-                if (!nav) return null;
-                const btns = [...nav.querySelectorAll('a, button')];
-                const last = btns[btns.length - 1];
-                if (!last) return null;
-                if (last.getAttribute('aria-disabled') === 'true') return null;
-                if (last.hasAttribute('disabled')) return null;
-                // If it's an <a> tag, get the href directly
-                const href = last.getAttribute('href');
-                if (href) return href.startsWith('http') ? href : `https://www.airbnb.com${href}`;
-                return null;
+            const navLinks = await page.$$('nav a[href]');
+            let nextLink = null;
+
+            for (const link of navLinks) {
+                const text = await link.textContent();
+                if (text?.trim() === String(pageNum + 1)) {
+                    nextLink = link;
+                    break;
+                }
+            }
+            if (!nextLink && navLinks.length > 0) {
+                nextLink = navLinks[navLinks.length - 1];
+            }
+
+            if (!nextLink) {
+                console.log('  No next page link — done.');
+                break;
+            }
+
+            const linkText = await nextLink.textContent();
+            console.log(`  Clicking: "${linkText?.trim()}"`);
+
+            const firstBefore = await page.evaluate(() => {
+                const l = document.querySelector('a[href*="/rooms/"]');
+                return l ? l.href : '';
             });
 
-            if (!nextPageUrl) {
-                // Fallback: find and click the next button, then wait for listings to change
-                const firstListingId = await page.evaluate(() => {
-                    const link = document.querySelector('a[href*="/rooms/"]');
-                    return link ? link.href : null;
-                });
+            await nextLink.click();
 
-                const clicked = await page.evaluate(() => {
-                    const nav = document.querySelector('nav');
-                    if (!nav) return false;
-                    const btns = [...nav.querySelectorAll('a, button')];
-                    const last = btns[btns.length - 1];
-                    if (!last || last.getAttribute('aria-disabled') === 'true') return false;
-                    last.click();
-                    return true;
+            let changed = false;
+            for (let i = 0; i < 20; i++) {
+                await sleep(1000);
+                const firstAfter = await page.evaluate(() => {
+                    const l = document.querySelector('a[href*="/rooms/"]');
+                    return l ? l.href : '';
                 });
-
-                if (!clicked) {
-                    console.log('  No more pages.');
+                if (firstAfter && firstAfter !== firstBefore) {
+                    changed = true;
+                    console.log('  ✅ New page loaded');
                     break;
                 }
-
-                console.log('  Clicked next button — waiting for new listings...');
-                // Wait up to 15s for the first listing to change
-                let changed = false;
-                for (let i = 0; i < 15; i++) {
-                    await sleep(1000);
-                    const newFirstId = await page.evaluate(() => {
-                        const link = document.querySelector('a[href*="/rooms/"]');
-                        return link ? link.href : null;
-                    });
-                    if (newFirstId && newFirstId !== firstListingId) {
-                        changed = true;
-                        console.log('  ✅ New page loaded');
-                        break;
-                    }
-                }
-                if (!changed) {
-                    console.log('  Page did not change — stopping.');
-                    break;
-                }
-            } else {
-                console.log(`  Navigating to: ${nextPageUrl.substring(0, 100)}`);
-                await page.goto(nextPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                await sleep(3000);
             }
+            if (!changed) {
+                console.log('  Page did not change — done.');
+                break;
+            }
+            await sleep(3000);
         }
 
         console.log('\nDone!');
