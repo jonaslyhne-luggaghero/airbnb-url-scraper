@@ -128,16 +128,43 @@ const crawler = new PlaywrightCrawler({
                 break;
             }
 
-            // ── CLICK NEXT PAGE like a real user ──────────────
-            // Try to find and click the "next" pagination button
-            const nextBtn = await page.$('a[aria-label="Next"], button[aria-label="Next"], [data-testid="pagination-next"]');
+            // ── CLICK NEXT PAGE — find the > arrow button ─────
+            // Log pagination HTML to find exact selector
+            const paginationHtml = await page.evaluate(() => {
+                const nav = document.querySelector('nav');
+                return nav ? nav.outerHTML.substring(0, 2000) : 'No nav found';
+            });
+            console.log('  Pagination HTML:', paginationHtml);
+
+            // The > arrow is the last clickable element in the pagination nav
+            const nextBtn = await page.evaluate(() => {
+                // Find all links/buttons in pagination nav
+                const nav = document.querySelector('nav');
+                if (!nav) return null;
+                const btns = [...nav.querySelectorAll('a, button')];
+                // The last one is always the "next" arrow
+                const last = btns[btns.length - 1];
+                if (!last) return null;
+                // Check it's not disabled
+                if (last.getAttribute('aria-disabled') === 'true') return null;
+                if (last.hasAttribute('disabled')) return null;
+                return last.getAttribute('href') || last.className || 'found';
+            });
+
             if (!nextBtn) {
-                console.log('  No next page button found — reached last page.');
+                console.log('  No next button or already on last page.');
                 break;
             }
 
-            console.log('  Clicking next page...');
-            await nextBtn.click();
+            console.log('  Clicking next page arrow...');
+            // Click the last button in the nav
+            await page.evaluate(() => {
+                const nav = document.querySelector('nav');
+                if (!nav) return;
+                const btns = [...nav.querySelectorAll('a, button')];
+                const last = btns[btns.length - 1];
+                if (last) last.click();
+            });
 
             // Wait for new page content to load
             await page.waitForLoadState('domcontentloaded');
