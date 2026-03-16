@@ -1,5 +1,6 @@
 import { Actor } from 'apify';
-import { PlaywrightCrawler, sleep } from '@crawlee/playwright';
+import { PlaywrightCrawler } from '@crawlee/playwright';
+import { sleep } from 'crawlee';
 
 await Actor.init();
 
@@ -52,7 +53,7 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
     countryCode: 'IE',
 });
 
-// Process one page at a time, each with a completely fresh browser + proxy session
+// Each page gets its own crawler = fresh browser + fresh proxy session
 for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
     const offset = i * 18;
     const url = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=14&items_offset=${offset}&section_offset=3`;
@@ -61,7 +62,6 @@ for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
 
     let pageHtml = '';
 
-    // Each page gets its own crawler = fresh browser + fresh proxy session
     const crawler = new PlaywrightCrawler({
         proxyConfiguration,
         headless: true,
@@ -69,7 +69,7 @@ for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
         requestHandlerTimeoutSecs: 120,
         maxConcurrency: 1,
         maxRequestRetries: 2,
-        useSessionPool: false, // disable session reuse — force fresh session each time
+        useSessionPool: false,
         launchContext: {
             launchOptions: {
                 args: ['--disable-gpu', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
@@ -77,8 +77,7 @@ for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
         },
         requestHandler: async ({ page }) => {
             await page.waitForLoadState('domcontentloaded');
-            await sleep(8000); // wait for JS to fully render listings
-
+            await sleep(8000);
             pageHtml = await page.evaluate(() => document.documentElement.innerHTML || '');
             console.log(`  HTML size: ${pageHtml.length}`);
         },
@@ -87,13 +86,12 @@ for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
     await crawler.run([{ url }]);
 
     if (pageHtml.length < 200000) {
-        console.log(`  Page too small (${pageHtml.length} chars) — bot detection, skipping`);
+        console.log(`  Page too small (${pageHtml.length} chars) — likely bot detection, skipping`);
         continue;
     }
 
     // Extract room IDs
-    const rawIds = [...pageHtml.matchAll(/\/rooms\/(\d+)/g)].map(m => m[1]);
-    const pageIds = [...new Set(rawIds)];
+    const pageIds = [...new Set([...pageHtml.matchAll(/\/rooms\/(\d+)/g)].map(m => m[1]))];
     console.log(`  Found ${pageIds.length} IDs`);
 
     // Detect business hosts
@@ -113,6 +111,7 @@ for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
             console.log(`  ✅ Business host: /rooms/${id}`);
         }
     }
+    console.log(`  Business hosts on this page: ${businessIds.size}`);
 
     let newCount = 0;
     for (const id of pageIds) {
@@ -127,7 +126,6 @@ for (let i = 0; i < totalPages && allListings.length < maxListings; i++) {
     }
     console.log(`  New: ${newCount}, Total: ${allListings.length}`);
 
-    // Small delay between pages
     if (i < totalPages - 1) await sleep(3000);
 }
 
