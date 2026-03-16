@@ -139,8 +139,8 @@ const crawler = new PlaywrightCrawler({
             const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
             console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
-            if (newUrls.length === 0 && pageNum > 1) {
-                console.log('  No new business hosts — stopping.');
+            if (newUrls.length === 0 && pageNum > 2) {
+                console.log('  No new business hosts on this page — stopping.');
                 break;
             }
 
@@ -192,10 +192,14 @@ const crawler = new PlaywrightCrawler({
                         else if (label === 'address' || label === 'adresse') address = value;
                     }
 
+                    // Get rating and reviews — check multiple patterns
                     const pageText = await tab.evaluate(() => document.body.innerText || '');
-                    const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*\d+\s*review/i);
+                    const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*[\d,]+\s*review/i)
+                        || pageText.match(/Rated\s+([\d.]+)\s+out of 5/i)
+                        || pageText.match(/(\d\.\d{1,2})\s*★/);
                     const starRating = ratingMatch ? parseFloat(ratingMatch[1]) : null;
-                    const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*(\d[\d,]+)\s*review/i);
+                    const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*([\d,]+)\s*review/i)
+                        || pageText.match(/([\d,]+)\s+reviews?/i);
                     const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/,/g, '')) : null;
 
                     if ((companyName || email || phone) && !seenCompanies.has(email || companyName)) {
