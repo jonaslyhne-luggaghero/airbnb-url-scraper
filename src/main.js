@@ -43,7 +43,14 @@ const CITIES = {
 };
 
 const coords = CITIES[city] || CITIES['Copenhagen'];
-const startUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
+// Add date range ~30 days from now so pagination works correctly
+const checkIn = new Date();
+checkIn.setDate(checkIn.getDate() + 30);
+const checkOut = new Date(checkIn);
+checkOut.setDate(checkOut.getDate() + 7);
+const fmt = d => d.toISOString().split('T')[0];
+
+const startUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12&checkin=${fmt(checkIn)}&checkout=${fmt(checkOut)}`;
 
 console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
@@ -114,7 +121,7 @@ const crawler = new PlaywrightCrawler({
                 try {
                     const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
                     await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                    await sleep(4000);
+                    await sleep(6000); // increased from 4s to 6s
 
                     // Find modal text
                     let modalText = '';
