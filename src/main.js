@@ -47,6 +47,8 @@ const startUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_
 
 console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
+const seenUrls = new Set(); // track already-processed listings
+
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
     countryCode: 'IE',
@@ -116,7 +118,11 @@ const crawler = new PlaywrightCrawler({
             console.log(`  Found ${businessListingUrls.length} business host listings on this page`);
 
             // ── Visit each business listing and extract details ──
-            for (const listingUrl of businessListingUrls) {
+            const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
+            console.log(`  ${newUrls.length} new (${businessListingUrls.length - newUrls.length} already seen)`);
+
+            for (const listingUrl of newUrls) {
+                seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
 
                 try {
@@ -156,10 +162,10 @@ const crawler = new PlaywrightCrawler({
                         const value = line.substring(colonIdx + 1).trim();
                         if (!value) continue;
 
-                        if (label.includes('business name') || label.includes('company') || label.includes('firmanavn') || label.includes('raison sociale')) companyName = value;
-                        else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat number')) registrationNumber = value;
-                        else if (label === 'email' || label === 'e-mail' || label === 'courriel') email = value;
-                        else if (label === 'phone' || label === 'telefon' || label === 'téléphone') phone = value;
+                        if (label.includes('business name') || label.includes('company') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
+                        else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat number') || label.includes('siren') || label.includes('siret')) registrationNumber = value;
+                        else if (label === 'email' || label === 'e-mail' || label === 'courriel' || label.includes('email')) email = value;
+                        else if (label === 'phone' || label === 'telefon' || label === 'téléphone' || label === 'tél' || label === 'tel' || label.includes('phone') || label.includes('mobile')) phone = value;
                         else if (label === 'address' || label === 'adresse') address = value;
                     }
 
