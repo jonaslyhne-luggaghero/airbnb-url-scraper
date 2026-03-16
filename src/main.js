@@ -1,6 +1,7 @@
 import { Actor } from 'apify';
 import { PlaywrightCrawler } from '@crawlee/playwright';
-import { sleep } from 'crawlee';
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 await Actor.init();
 
