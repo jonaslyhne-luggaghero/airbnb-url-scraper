@@ -68,6 +68,7 @@ const crawler = new PlaywrightCrawler({
     },
     requestHandler: async ({ page }) => {
         let pageNum = 0;
+        let searchPageUrl = startUrl; // track the current search page URL
 
         while (pageNum < maxPages) {
             pageNum++;
@@ -117,7 +118,9 @@ const crawler = new PlaywrightCrawler({
 
             console.log(`  Found ${businessListingUrls.length} business host listings on this page`);
 
-            // ── Visit each business listing and extract details ──
+            // Save the search page URL before leaving to visit listings
+            searchPageUrl = page.url();
+            console.log(`  Saved search URL: ${searchPageUrl}`);
             const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
             console.log(`  ${newUrls.length} new (${businessListingUrls.length - newUrls.length} already seen)`);
 
@@ -211,13 +214,17 @@ const crawler = new PlaywrightCrawler({
             // ── Click next page ──────────────────────────────────
             console.log('  Looking for next page button...');
 
-            // Navigate back to search page if we left it
+            // Navigate back to the exact search page URL we were on
             const currentUrl = page.url();
             if (!currentUrl.includes('/s/')) {
-                console.log('  Navigating back to search...');
-                await page.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+                console.log('  Navigating back to search page...');
+                await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
                 await sleep(5000);
             }
+
+            // After visiting listings, click next from the saved search page
+            await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await sleep(4000);
 
             const hasNext = await page.evaluate(() => {
                 const nav = document.querySelector('nav');
