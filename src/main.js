@@ -238,7 +238,10 @@ const crawler = new PlaywrightCrawler({
 
             // Scroll to bottom to ensure pagination is rendered
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-            await sleep(2000);
+            await sleep(3000);
+            // Scroll back up slightly so pagination nav is visible
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight - 500));
+            await sleep(1000);
 
             // Get the next page URL directly from the nav link's href
             const nextPageUrl = await page.evaluate(() => {
@@ -256,7 +259,12 @@ const crawler = new PlaywrightCrawler({
             });
 
             if (!nextPageUrl) {
-                // Fallback: try clicking the last nav button
+                // Fallback: find and click the next button, then wait for listings to change
+                const firstListingId = await page.evaluate(() => {
+                    const link = document.querySelector('a[href*="/rooms/"]');
+                    return link ? link.href : null;
+                });
+
                 const clicked = await page.evaluate(() => {
                     const nav = document.querySelector('nav');
                     if (!nav) return false;
@@ -266,12 +274,31 @@ const crawler = new PlaywrightCrawler({
                     last.click();
                     return true;
                 });
+
                 if (!clicked) {
                     console.log('  No more pages.');
                     break;
                 }
-                console.log('  Clicked next button (fallback)');
-                await sleep(6000);
+
+                console.log('  Clicked next button — waiting for new listings...');
+                // Wait up to 15s for the first listing to change
+                let changed = false;
+                for (let i = 0; i < 15; i++) {
+                    await sleep(1000);
+                    const newFirstId = await page.evaluate(() => {
+                        const link = document.querySelector('a[href*="/rooms/"]');
+                        return link ? link.href : null;
+                    });
+                    if (newFirstId && newFirstId !== firstListingId) {
+                        changed = true;
+                        console.log('  ✅ New page loaded');
+                        break;
+                    }
+                }
+                if (!changed) {
+                    console.log('  Page did not change — stopping.');
+                    break;
+                }
             } else {
                 console.log(`  Navigating to: ${nextPageUrl.substring(0, 100)}`);
                 await page.goto(nextPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
