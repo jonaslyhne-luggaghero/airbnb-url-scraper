@@ -231,44 +231,29 @@ const crawler = new PlaywrightCrawler({
             console.log('  Clicking next page...');
             const currentPageUrl = page.url();
 
-            // Get current listing IDs to detect when page content changes
-            const getCurrentIds = () => page.evaluate(() => {
-                const links = [...document.querySelectorAll('a[href*="/rooms/"]')];
-                return links.slice(0, 3).map(l => l.href).join(',');
-            });
-
-            const idsBefore = await getCurrentIds();
-
-            const clicked = await page.evaluate(() => {
+            // Get the next page URL directly from the nav link's href
+            const nextPageUrl = await page.evaluate(() => {
                 const nav = document.querySelector('nav');
-                if (!nav) return false;
+                if (!nav) return null;
                 const btns = [...nav.querySelectorAll('a, button')];
                 const last = btns[btns.length - 1];
-                if (!last || last.getAttribute('aria-disabled') === 'true' || last.hasAttribute('disabled')) return false;
-                last.click();
-                return true;
+                if (!last) return null;
+                if (last.getAttribute('aria-disabled') === 'true') return null;
+                if (last.hasAttribute('disabled')) return null;
+                // If it's an <a> tag, get the href directly
+                const href = last.getAttribute('href');
+                if (href) return href.startsWith('http') ? href : `https://www.airbnb.com${href}`;
+                return null;
             });
 
-            if (!clicked) {
-                console.log('  No more pages.');
+            if (!nextPageUrl) {
+                console.log('  No next page link found — done.');
                 break;
             }
 
-            // Wait for listing content to actually change
-            let contentChanged = false;
-            for (let i = 0; i < 15; i++) {
-                await sleep(1000);
-                const idsAfter = await getCurrentIds();
-                if (idsAfter !== idsBefore) {
-                    contentChanged = true;
-                    console.log('  Page content changed ✅');
-                    break;
-                }
-            }
-            if (!contentChanged) {
-                console.log('  Content did not change after 15s — may be last page');
-            }
-            await sleep(3000);
+            console.log(`  Navigating to next page: ${nextPageUrl.substring(0, 120)}`);
+            await page.goto(nextPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await sleep(5000);
         }
 
         console.log('\nDone!');
