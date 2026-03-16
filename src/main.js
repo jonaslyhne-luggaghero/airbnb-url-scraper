@@ -47,18 +47,18 @@ const startUrl = `https://www.airbnb.com/s/${encodeURIComponent(city)}/homes?ne_
 
 console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
-const seenUrls = new Set(); // track already-processed listings
-
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
     countryCode: 'IE',
 });
 
+const seenUrls = new Set();
+
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     headless: true,
     navigationTimeoutSecs: 90,
-    requestHandlerTimeoutSecs: 600,
+    requestHandlerTimeoutSecs: 1800,
     maxConcurrency: 1,
     maxRequestRetries: 2,
     launchContext: {
@@ -66,9 +66,8 @@ const crawler = new PlaywrightCrawler({
             args: ['--disable-gpu', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
         },
     },
-    requestHandler: async ({ page }) => {
+    requestHandler: async ({ page, browserController }) => {
         let pageNum = 0;
-        let searchPageUrl = startUrl; // track the current search page URL
 
         while (pageNum < maxPages) {
             pageNum++;
@@ -77,28 +76,12 @@ const crawler = new PlaywrightCrawler({
             await page.waitForLoadState('domcontentloaded');
             await sleep(5000);
 
-            // ── Debug: check what's on the page ──────────────────
-            const debugInfo = await page.evaluate(() => {
-                const allText = document.body.innerText || '';
-                const hasBusinessHost = allText.includes('Business host');
-                const roomLinks = [...document.querySelectorAll('a[href*="/rooms/"]')].length;
-                // Find elements containing "Business host" text
-                const allEls = [...document.querySelectorAll('*')];
-                const businessEls = allEls
-                    .filter(el => el.childNodes.length === 1 && el.textContent?.trim() === 'Business host')
-                    .map(el => el.tagName + '.' + el.className.split(' ')[0]);
-                return { hasBusinessHost, roomLinks, businessEls: businessEls.slice(0, 10), textSample: allText.substring(0, 300) };
-            });
-            console.log('  Debug:', JSON.stringify(debugInfo));
-
-            // ── Find all listing cards that say "Business host" ──
+            // Find all "Business host" listing URLs on this page
             const businessListingUrls = await page.evaluate(() => {
                 const results = [];
-                // Find all elements whose text is exactly "Business host"
                 const allEls = [...document.querySelectorAll('*')];
                 for (const el of allEls) {
-                    if (el.textContent?.trim() === 'Business host') {
-                        // Walk up to find the closest parent with a /rooms/ link
+                    if (el.childNodes.length <= 3 && el.textContent?.trim() === 'Business host') {
                         let parent = el.parentElement;
                         for (let i = 0; i < 15; i++) {
                             if (!parent) break;
@@ -116,46 +99,43 @@ const crawler = new PlaywrightCrawler({
                 return [...new Set(results)];
             });
 
-            console.log(`  Found ${businessListingUrls.length} business host listings on this page`);
-
-            // Save the search page URL before leaving to visit listings
-            searchPageUrl = page.url();
-            console.log(`  Saved search URL: ${searchPageUrl}`);
             const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
-            console.log(`  ${newUrls.length} new (${businessListingUrls.length - newUrls.length} already seen)`);
+            console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
+            // ── Open each listing in a NEW TAB — search page stays open ──
             for (const listingUrl of newUrls) {
                 seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
 
+                // Open new tab
+                const context = page.context();
+                const tab = await context.newPage();
+
                 try {
-                    // Navigate to the modal directly
                     const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    await page.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
                     await sleep(4000);
 
-                    // Find modal
+                    // Find modal text
                     let modalText = '';
-                    const modalSelectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
-                    for (const sel of modalSelectors) {
+                    const selectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
+                    for (const sel of selectors) {
                         try {
-                            await page.waitForSelector(sel, { timeout: 5000 });
-                            const el = await page.$(sel);
+                            await tab.waitForSelector(sel, { timeout: 5000 });
+                            const el = await tab.$(sel);
                             if (el) {
-                                modalText = await page.evaluate(el => el.innerText || '', el);
+                                modalText = await tab.evaluate(el => el.innerText || '', el);
                                 if (modalText.length > 50) break;
                             }
                         } catch (e) { /* try next */ }
                     }
-
                     if (!modalText || modalText.length < 50) {
-                        modalText = await page.evaluate(() => document.body.innerText || '');
+                        modalText = await tab.evaluate(() => document.body.innerText || '');
                     }
 
-                    // Parse fields from modal text
+                    // Parse modal fields
                     let companyName = null, email = null, phone = null;
-                    let address = null, registrationNumber = null, city_val = null;
-                    let starRating = null, reviewCount = null;
+                    let address = null, registrationNumber = null;
 
                     const lines = modalText.split('\n').map(l => l.trim()).filter(Boolean);
                     for (const line of lines) {
@@ -166,27 +146,24 @@ const crawler = new PlaywrightCrawler({
                         if (!value) continue;
 
                         if (label.includes('business name') || label.includes('company') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
-                        else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat number') || label.includes('siren') || label.includes('siret')) registrationNumber = value;
-                        else if (label === 'email' || label === 'e-mail' || label === 'courriel' || label.includes('email')) email = value;
-                        else if (label === 'phone' || label === 'telefon' || label === 'téléphone' || label === 'tél' || label === 'tel' || label.includes('phone') || label.includes('mobile')) phone = value;
+                        else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat') || label.includes('siren') || label.includes('siret')) registrationNumber = value;
+                        else if (label.includes('email') || label === 'e-mail' || label === 'courriel') email = value;
+                        else if (label.includes('phone') || label === 'telefon' || label === 'téléphone' || label === 'tél' || label.includes('mobile')) phone = value;
                         else if (label === 'address' || label === 'adresse') address = value;
                     }
 
-                    // Get city, rating, reviews from the listing page
-                    const pageText = await page.evaluate(() => document.body.innerText || '');
+                    // Get rating and reviews from page text
+                    const pageText = await tab.evaluate(() => document.body.innerText || '');
                     const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*\d+\s*review/i);
-                    if (ratingMatch) starRating = parseFloat(ratingMatch[1]);
-                    const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*(\d+)\s*review/i);
-                    if (reviewMatch) reviewCount = parseInt(reviewMatch[1]);
-                    const cityMatch = pageText.match(/(?:Entire|Room|Private|Shared|Apartment|House|Hotel)[^\n]*in\s+([A-Z][a-zA-Z\s\-]+),\s*(?:France|Denmark|Germany|Spain|Italy|Netherlands|Austria|Belgium|Sweden|Norway|Finland|Poland|Czech|Hungary|Portugal|Ireland)/);
-                    if (cityMatch) city_val = cityMatch[1].trim();
-                    if (!city_val) city_val = city;
+                    const starRating = ratingMatch ? parseFloat(ratingMatch[1]) : null;
+                    const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*(\d[\d,]+)\s*review/i);
+                    const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/,/g, '')) : null;
 
                     if (companyName || email || phone) {
                         console.log(`    ✅ ${companyName} | ${email} | ${phone}`);
                         await Actor.pushData({
                             url: listingUrl,
-                            city: city_val,
+                            city,
                             companyName,
                             email,
                             phone,
@@ -198,62 +175,36 @@ const crawler = new PlaywrightCrawler({
                             scrapedAt: new Date().toISOString(),
                         });
                     } else {
-                        console.log(`    ⚠️ Business host but no company details extracted`);
+                        console.log(`    ⚠️ No details extracted`);
                     }
-
-                    // Go back to search results
-                    await page.goto(page.url().split('?')[0].replace('/rooms/', '/s/').split('/rooms')[0] || startUrl, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
-                    await page.goBack({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-                    await sleep(3000);
-
                 } catch (err) {
                     console.log(`    ❌ Error: ${err.message}`);
+                } finally {
+                    await tab.close(); // Always close the tab
                 }
             }
 
-            // ── Click next page ──────────────────────────────────
-            console.log('  Looking for next page button...');
-
-            // Navigate back to the exact search page URL we were on
-            const currentUrl = page.url();
-            if (!currentUrl.includes('/s/')) {
-                console.log('  Navigating back to search page...');
-                await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                await sleep(5000);
-            }
-
-            // After visiting listings, click next from the saved search page
-            await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            await sleep(4000);
-
-            const hasNext = await page.evaluate(() => {
+            // ── Click next page — we never left the search page ──
+            console.log('  Clicking next page...');
+            const clicked = await page.evaluate(() => {
                 const nav = document.querySelector('nav');
                 if (!nav) return false;
                 const btns = [...nav.querySelectorAll('a, button')];
                 const last = btns[btns.length - 1];
-                if (!last) return false;
-                if (last.getAttribute('aria-disabled') === 'true') return false;
-                if (last.hasAttribute('disabled')) return false;
+                if (!last || last.getAttribute('aria-disabled') === 'true' || last.hasAttribute('disabled')) return false;
+                last.click();
                 return true;
             });
 
-            if (!hasNext) {
+            if (!clicked) {
                 console.log('  No more pages.');
                 break;
             }
 
-            await page.evaluate(() => {
-                const nav = document.querySelector('nav');
-                if (!nav) return;
-                const btns = [...nav.querySelectorAll('a, button')];
-                btns[btns.length - 1]?.click();
-            });
-
-            console.log('  Clicked next page, waiting...');
             await sleep(6000);
         }
 
-        console.log('\nDone scraping all pages!');
+        console.log('\nDone!');
     },
 });
 
