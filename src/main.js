@@ -11,7 +11,7 @@ const maxPages = input.maxPages ?? 10;
 
 const CITIES = {
     'Copenhagen':   { ne_lat: 55.730, ne_lng: 12.660, sw_lat: 55.630, sw_lng: 12.490 },
-    'Paris':        { ne_lat: 48.910, ne_lng: 2.420,  sw_lat: 48.810, sw_lng: 2.270  },
+    'Paris':        { ne_lat: 48.950, ne_lng: 2.470,  sw_lat: 48.790, sw_lng: 2.220  },
     'Amsterdam':    { ne_lat: 52.420, ne_lng: 4.970,  sw_lat: 52.330, sw_lng: 4.840  },
     'Berlin':       { ne_lat: 52.570, ne_lng: 13.480, sw_lat: 52.460, sw_lng: 13.320 },
     'Barcelona':    { ne_lat: 41.430, ne_lng: 2.230,  sw_lat: 41.340, sw_lng: 2.110  },
@@ -83,7 +83,7 @@ console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
-    countryCode: 'FR', // Use French proxy so Airbnb stays on .com/fr, not .ie
+    countryCode: 'FR',
 });
 
 const seenUrls = new Set();
@@ -106,7 +106,7 @@ const crawler = new PlaywrightCrawler({
         while (pageNum < maxPages) {
             pageNum++;
             console.log(`\n--- Page ${pageNum} ---`);
-            console.log(`  URL: ${page.url().substring(0, 120)}`);
+            console.log(`  URL: ${page.url().substring(0, 200)}`);
 
             await page.waitForLoadState('domcontentloaded');
             await sleep(5000);
@@ -137,6 +137,12 @@ const crawler = new PlaywrightCrawler({
             const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
             console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
+            // Stop if no new results found
+            if (newUrls.length === 0 && pageNum > 1) {
+                console.log('  No new business hosts — stopping.');
+                break;
+            }
+
             // Open each listing in a new tab — search page stays open
             for (const listingUrl of newUrls) {
                 seenUrls.add(listingUrl);
@@ -146,17 +152,10 @@ const crawler = new PlaywrightCrawler({
                 const tab = await context.newPage();
 
                 try {
-                    // Use same domain as the search page to avoid redirect issues
                     const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
                     await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
                     await sleep(6000);
-
-                    // Debug: log what the tab actually loaded
-                    const tabTitle = await tab.title();
-                    const tabText = await tab.evaluate(() => document.body.innerText?.substring(0, 300) || '');
-                    console.log(`    Tab title: ${tabTitle}`);
-                    console.log(`    Tab text sample: ${tabText.substring(0, 150)}`);
 
                     // Find modal text
                     let modalText = '';
@@ -245,17 +244,14 @@ const crawler = new PlaywrightCrawler({
                 break;
             }
 
-            // Wait for URL to change OR for new listings to appear
             try {
                 await page.waitForFunction(
                     (oldUrl) => window.location.href !== oldUrl,
                     currentPageUrl,
                     { timeout: 15000 }
                 );
-                console.log(`  New URL: ${page.url().substring(0, 100)}`);
+                console.log(`  New URL: ${page.url().substring(0, 120)}`);
             } catch (e) {
-                // URL didn't change via href — check if items_offset changed in the URL
-                // or if Airbnb uses history.pushState (doesn't trigger waitForFunction)
                 console.log('  Waiting for page content to update...');
                 await sleep(8000);
             }
