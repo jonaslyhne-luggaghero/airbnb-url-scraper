@@ -83,7 +83,7 @@ console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
-    countryCode: 'IE',
+    countryCode: 'FR', // Use French proxy so Airbnb stays on .com/fr, not .ie
 });
 
 const seenUrls = new Set();
@@ -146,7 +146,9 @@ const crawler = new PlaywrightCrawler({
                 const tab = await context.newPage();
 
                 try {
-                    const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
+                    // Use same domain as the search page to avoid redirect issues
+                    const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
+                    const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
                     await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
                     await sleep(6000);
 
@@ -237,15 +239,19 @@ const crawler = new PlaywrightCrawler({
                 break;
             }
 
-            // Wait for URL to change — confirms new page loaded
+            // Wait for URL to change OR for new listings to appear
             try {
                 await page.waitForFunction(
                     (oldUrl) => window.location.href !== oldUrl,
                     currentPageUrl,
                     { timeout: 15000 }
                 );
+                console.log(`  New URL: ${page.url().substring(0, 100)}`);
             } catch (e) {
-                console.log('  URL did not change after click');
+                // URL didn't change via href — check if items_offset changed in the URL
+                // or if Airbnb uses history.pushState (doesn't trigger waitForFunction)
+                console.log('  Waiting for page content to update...');
+                await sleep(8000);
             }
 
             await page.waitForLoadState('domcontentloaded');
