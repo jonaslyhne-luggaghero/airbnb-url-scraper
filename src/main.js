@@ -30,7 +30,6 @@ const CITY_URLS = {
     'Milan': 'Milan--Italy',
 };
 
-// Place IDs from Google Places — these match what Airbnb uses internally
 const CITY_PLACE_IDS = {
     'Copenhagen': 'ChIJIXslnXxTUkYROM9UXS9XCEY',
     'Paris':      'ChIJD7fiBh9u5kcRYJSMaMOCCwQ',
@@ -56,8 +55,8 @@ const CITY_PLACE_IDS = {
 
 console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
-const placeId = CITY_PLACE_IDS[city] || CITY_PLACE_IDS['Copenhagen'];
 const citySlug = CITY_URLS[city] || encodeURIComponent(city);
+const placeId = CITY_PLACE_IDS[city] || CITY_PLACE_IDS['Copenhagen'];
 const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?refinement_paths%5B%5D=%2Fhomes&place_id=${placeId}&search_type=AUTOSUGGEST`;
 
 const proxyConfiguration = await Actor.createProxyConfiguration({
@@ -75,23 +74,22 @@ const crawler = new PlaywrightCrawler({
     requestHandlerTimeoutSecs: 3600,
     maxConcurrency: 1,
     requestHandler: async ({ page }) => {
-        let nextPageUrl = startUrl;
+
+        // Navigate to start
+        await page.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        try {
+            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 });
+        } catch {
+            console.log('Timeout waiting for listings on page 1 — stopping.');
+            return;
+        }
+        await new Promise(r => setTimeout(r, 6000));
 
         for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
             console.log(`\n--- Page ${pageNum} ---`);
-
-            // Navigate to this search page
-            await page.goto(nextPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            try {
-                await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 });
-            } catch {
-                console.log('  Timeout waiting for listings — stopping.');
-                break;
-            }
-            await new Promise(r => setTimeout(r, 6000));
             console.log(`  URL: ${page.url()}`);
 
-            // Collect business host URLs
+            // Collect business host URLs on this page
             const businessUrls = await page.evaluate(() => {
                 const urls = [];
                 const allLinks = document.querySelectorAll('a[href*="/rooms/"]');
@@ -112,49 +110,16 @@ const crawler = new PlaywrightCrawler({
             newUrls.forEach(u => seenUrls.add(u));
             console.log(`  Found ${businessUrls.length} business hosts, ${newUrls.length} new`);
 
-            // Grab next page URL NOW before leaving search page
-            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-            await new Promise(r => setTimeout(r, 2000));
-
-            const grabbedNext = await page.evaluate(() => {
-                const nav = document.querySelector('nav');
-                if (!nav) return null;
-                const links = [...nav.querySelectorAll('a[href]')];
-                // Log all nav link texts for debugging
-                const navInfo = links.map(l => l.textContent.trim() + '=' + l.href).join(' | ');
-                // Try arrow labels
-                for (const link of links) {
-                    const t = (link.textContent || '').trim();
-                    if (t === '›' || t === '>' || t === 'Next' || t === '→' || t === '»') return link.href;
-                }
-                // Find current page number, return next
-                const current = nav.querySelector('[aria-current="page"]');
-                if (current) {
-                    const n = parseInt(current.textContent.trim());
-                    if (!isNaN(n)) {
-                        for (const link of links) {
-                            if (parseInt((link.textContent || '').trim()) === n + 1) return link.href;
-                        }
-                    }
-                }
-                // Last resort: last nav link
-                const nonCurrent = links.filter(l => !l.getAttribute('aria-current'));
-                return nonCurrent.length > 0 ? nonCurrent[nonCurrent.length - 1].href : null;
-            });
-
-            console.log(`  Next page URL: ${grabbedNext ? grabbedNext.substring(0, 100) + '...' : 'none'}`);
-
             // Process each business listing
             for (const listingUrl of newUrls) {
                 console.log(`  Processing: ${listingUrl}`);
                 try {
-                    // Step 1: load listing page to get session cookies
+                    // Step 1: load listing to get session
                     await page.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
                     await new Promise(r => setTimeout(r, 4000));
 
-                    // Step 2: navigate to modal
-                    const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    await page.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+                    // Step 2: load modal
+                    await page.goto(`${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`, { waitUntil: 'domcontentloaded', timeout: 45000 });
                     await new Promise(r => setTimeout(r, 4000));
                     await page.waitForSelector('[role="dialog"]', { timeout: 15000 }).catch(() => {});
 
@@ -232,13 +197,51 @@ const crawler = new PlaywrightCrawler({
                 await new Promise(r => setTimeout(r, 2000));
             }
 
-            // Stop or advance
-            if (!grabbedNext || grabbedNext === nextPageUrl) {
-                console.log('\n  No next page found — done.');
+            if (pageNum >= maxPages) break;
+
+            // Go back to search page and click the next page number
+            console.log(`  Finding next page...`);
+            await page.goto(startUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 }).catch(() => {});
+            await new Promise(r => setTimeout(r, 4000));
+
+            // Scroll to bottom so pagination nav renders
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await new Promise(r => setTimeout(r, 2000));
+
+            // Click page number (pageNum + 1)
+            const targetPage = pageNum + 1;
+            const clicked = await page.evaluate((target) => {
+                const nav = document.querySelector('nav');
+                if (!nav) return null;
+                const links = [...nav.querySelectorAll('a')];
+                for (const link of links) {
+                    if (link.textContent.trim() === String(target)) {
+                        link.click();
+                        return target;
+                    }
+                }
+                // Fallback: click the > arrow
+                for (const link of links) {
+                    const t = link.textContent.trim();
+                    if (t === '›' || t === '>' || t === '→' || t === '»') {
+                        link.click();
+                        return 'arrow';
+                    }
+                }
+                return null;
+            }, targetPage);
+
+            if (!clicked) {
+                console.log('  No next page found — done.');
                 break;
             }
-            nextPageUrl = grabbedNext;
-            console.log(`  → Moving to page ${pageNum + 1}`);
+
+            console.log(`  Clicking: "${clicked}"`);
+            await new Promise(r => setTimeout(r, 3000));
+            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
+            await new Promise(r => setTimeout(r, 3000));
+            console.log(`  ✅ New page loaded`);
         }
 
         console.log(`\nDone! Found ${results.length} unique business hosts.`);
