@@ -30,34 +30,35 @@ const CITY_URLS = {
     'Milan': 'Milan--Italy',
 };
 
-const CITIES = {
-    'Copenhagen': { ne_lat: 55.700, ne_lng: 12.620, sw_lat: 55.660, sw_lng: 12.540 },
-    'Paris':      { ne_lat: 48.950, ne_lng: 2.470,  sw_lat: 48.790, sw_lng: 2.220  },
-    'Berlin':     { ne_lat: 52.570, ne_lng: 13.480, sw_lat: 52.460, sw_lng: 13.320 },
-    'Amsterdam':  { ne_lat: 52.410, ne_lng: 4.970,  sw_lat: 52.340, sw_lng: 4.840  },
-    'Rome':       { ne_lat: 41.940, ne_lng: 12.540, sw_lat: 41.860, sw_lng: 12.430 },
-    'Barcelona':  { ne_lat: 41.430, ne_lng: 2.220,  sw_lat: 41.350, sw_lng: 2.100  },
-    'Vienna':     { ne_lat: 48.270, ne_lng: 16.450, sw_lat: 48.170, sw_lng: 16.300 },
-    'Prague':     { ne_lat: 50.130, ne_lng: 14.510, sw_lat: 50.040, sw_lng: 14.380 },
-    'Lisbon':     { ne_lat: 38.770, ne_lng: -9.080, sw_lat: 38.690, sw_lng: -9.220 },
-    'Dublin':     { ne_lat: 53.380, ne_lng: -6.190, sw_lat: 53.310, sw_lng: -6.320 },
-    'Brussels':   { ne_lat: 50.890, ne_lng: 4.430,  sw_lat: 50.820, sw_lng: 4.310  },
-    'Warsaw':     { ne_lat: 52.290, ne_lng: 21.080, sw_lat: 52.190, sw_lng: 20.930 },
-    'Budapest':   { ne_lat: 47.560, ne_lng: 19.100, sw_lat: 47.450, sw_lng: 18.980 },
-    'Stockholm':  { ne_lat: 59.370, ne_lng: 18.130, sw_lat: 59.290, sw_lng: 17.980 },
-    'Oslo':       { ne_lat: 59.960, ne_lng: 10.820, sw_lat: 59.880, sw_lng: 10.680 },
-    'Helsinki':   { ne_lat: 60.200, ne_lng: 25.050, sw_lat: 60.140, sw_lng: 24.900 },
-    'Zurich':     { ne_lat: 47.410, ne_lng: 8.600,  sw_lat: 47.340, sw_lng: 8.490  },
-    'Munich':     { ne_lat: 48.180, ne_lng: 11.650, sw_lat: 48.090, sw_lng: 11.490 },
-    'Hamburg':    { ne_lat: 53.620, ne_lng: 10.080, sw_lat: 53.520, sw_lng: 9.890  },
-    'Milan':      { ne_lat: 45.510, ne_lng: 9.250,  sw_lat: 45.430, sw_lng: 9.120  },
+// Place IDs from Google Places — these match what Airbnb uses internally
+const CITY_PLACE_IDS = {
+    'Copenhagen': 'ChIJIXslnXxTUkYROM9UXS9XCEY',
+    'Paris':      'ChIJD7fiBh9u5kcRYJSMaMOCCwQ',
+    'Berlin':     'ChIJAVkDPzdOqEcRcDteW0YgIQQ',
+    'Amsterdam':  'ChIJVXealLU_xkcRja_At0z9AGQ',
+    'Rome':       'ChIJu46S-ZZhLxMROG5lkwZ3D7k',
+    'Barcelona':  'ChIJ5TCOcRaYpBIRCmZHTz37sEQ',
+    'Vienna':     'ChIJn8N5CR47bUcRRluiXm7Sbr4',
+    'Prague':     'ChIJi3lwCZyTC0cRsV1MBHRMlhM',
+    'Lisbon':     'ChIJO_PkYRozGQ0R0DaQ5L3rAAQ',
+    'Dublin':     'ChIJYSWcYMlAEg0RSfQCLSe700Q',
+    'Brussels':   'ChIJZ2jCRO_Ew0cRKKGoPpxv0jY',
+    'Warsaw':     'ChIJAZ-GmmbMHkcR_NPqiCq-8HI',
+    'Budapest':   'ChIJyc_U0TTDQUcRmBxTBKhcCcI',
+    'Stockholm':  'ChIJywtkGTF2X0YRoMCifuDqKBY',
+    'Oslo':       'ChIJOfBn8mFuQUYRmh4j019gkn4',
+    'Helsinki':   'ChIJkQYhlscLkkYRB2XmBFqO9n8',
+    'Zurich':     'ChIJGaK-SZcLkEcRe07V4A0rCo8',
+    'Munich':     'ChIJ2V-Mo_l1nkcRlfp5jGBaehY',
+    'Hamburg':    'ChIJuRMYfoNhsUcRoDrWe_I9JgQ',
+    'Milan':      'ChIJ53USP0nBhkcRjQ50xhPN_zw',
 };
 
 console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
-const coords = CITIES[city] || CITIES['Copenhagen'];
+const placeId = CITY_PLACE_IDS[city] || CITY_PLACE_IDS['Copenhagen'];
 const citySlug = CITY_URLS[city] || encodeURIComponent(city);
-const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
+const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?refinement_paths%5B%5D=%2Fhomes&place_id=${placeId}&search_type=AUTOSUGGEST`;
 
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
