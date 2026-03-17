@@ -1,7 +1,5 @@
-import { Actor } from 'apify';
 import { PlaywrightCrawler } from '@crawlee/playwright';
-
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+import { Actor } from 'apify';
 
 await Actor.init();
 
@@ -9,278 +7,292 @@ const input = (await Actor.getInput()) ?? {};
 const city = input.city ?? 'Copenhagen';
 const maxPages = input.maxPages ?? 10;
 
-const CITIES = {
-    'Copenhagen':   { ne_lat: 55.730, ne_lng: 12.660, sw_lat: 55.630, sw_lng: 12.490 },
-    'Paris':        { ne_lat: 48.950, ne_lng: 2.470,  sw_lat: 48.790, sw_lng: 2.220  },
-    'Amsterdam':    { ne_lat: 52.420, ne_lng: 4.970,  sw_lat: 52.330, sw_lng: 4.840  },
-    'Berlin':       { ne_lat: 52.570, ne_lng: 13.480, sw_lat: 52.460, sw_lng: 13.320 },
-    'Barcelona':    { ne_lat: 41.430, ne_lng: 2.230,  sw_lat: 41.340, sw_lng: 2.110  },
-    'Madrid':       { ne_lat: 40.460, ne_lng: -3.640, sw_lat: 40.370, sw_lng: -3.760 },
-    'Rome':         { ne_lat: 41.950, ne_lng: 12.550, sw_lat: 41.840, sw_lng: 12.420 },
-    'Vienna':       { ne_lat: 48.260, ne_lng: 16.430, sw_lat: 48.160, sw_lng: 16.290 },
-    'Prague':       { ne_lat: 50.130, ne_lng: 14.500, sw_lat: 50.030, sw_lng: 14.360 },
-    'Lisbon':       { ne_lat: 38.780, ne_lng: -9.090, sw_lat: 38.680, sw_lng: -9.210 },
-    'Brussels':     { ne_lat: 50.900, ne_lng: 4.430,  sw_lat: 50.800, sw_lng: 4.310  },
-    'Stockholm':    { ne_lat: 59.380, ne_lng: 18.130, sw_lat: 59.290, sw_lng: 17.980 },
-    'Oslo':         { ne_lat: 59.960, ne_lng: 10.810, sw_lat: 59.870, sw_lng: 10.680 },
-    'Helsinki':     { ne_lat: 60.220, ne_lng: 25.060, sw_lat: 60.130, sw_lng: 24.890 },
-    'Munich':       { ne_lat: 48.190, ne_lng: 11.640, sw_lat: 48.090, sw_lng: 11.480 },
-    'Hamburg':      { ne_lat: 53.610, ne_lng: 10.070, sw_lat: 53.510, sw_lng: 9.910  },
-    'Warsaw':       { ne_lat: 52.290, ne_lng: 21.080, sw_lat: 52.180, sw_lng: 20.930 },
-    'Budapest':     { ne_lat: 47.560, ne_lng: 19.120, sw_lat: 47.450, sw_lng: 18.970 },
-    'Athens':       { ne_lat: 38.020, ne_lng: 23.800, sw_lat: 37.920, sw_lng: 23.670 },
-    'Milan':        { ne_lat: 45.520, ne_lng: 9.270,  sw_lat: 45.420, sw_lng: 9.120  },
-    'Zurich':       { ne_lat: 47.430, ne_lng: 8.610,  sw_lat: 47.330, sw_lng: 8.480  },
-    'Dublin':       { ne_lat: 53.390, ne_lng: -6.190, sw_lat: 53.300, sw_lng: -6.320 },
-    'Edinburgh':    { ne_lat: 56.000, ne_lng: -3.120, sw_lat: 55.900, sw_lng: -3.260 },
-    'Krakow':       { ne_lat: 50.110, ne_lng: 20.010, sw_lat: 50.010, sw_lng: 19.870 },
-    'Lyon':         { ne_lat: 45.810, ne_lng: 4.910,  sw_lat: 45.710, sw_lng: 4.780  },
-    'Zagreb':       { ne_lat: 45.870, ne_lng: 16.060, sw_lat: 45.770, sw_lng: 15.920 },
-    'Ljubljana':    { ne_lat: 46.110, ne_lng: 14.570, sw_lat: 46.010, sw_lng: 14.430 },
-    'Riga':         { ne_lat: 57.000, ne_lng: 24.180, sw_lat: 56.900, sw_lng: 24.040 },
-    'Tallinn':      { ne_lat: 59.490, ne_lng: 24.820, sw_lat: 59.390, sw_lng: 24.680 },
-    'Vilnius':      { ne_lat: 54.740, ne_lng: 25.350, sw_lat: 54.640, sw_lng: 25.210 },
+const CITY_URLS = {
+    'Copenhagen': 'Copenhagen--Denmark',
+    'Paris': 'Paris--France',
+    'Berlin': 'Berlin--Germany',
+    'Amsterdam': 'Amsterdam--Netherlands',
+    'Rome': 'Rome--Italy',
+    'Barcelona': 'Barcelona--Spain',
+    'Vienna': 'Vienna--Austria',
+    'Prague': 'Prague--Czech-Republic',
+    'Lisbon': 'Lisbon--Portugal',
+    'Dublin': 'Dublin--Ireland',
+    'Brussels': 'Brussels--Belgium',
+    'Warsaw': 'Warsaw--Poland',
+    'Budapest': 'Budapest--Hungary',
+    'Stockholm': 'Stockholm--Sweden',
+    'Oslo': 'Oslo--Norway',
+    'Helsinki': 'Helsinki--Finland',
+    'Zurich': 'Zurich--Switzerland',
+    'Munich': 'Munich--Germany',
+    'Hamburg': 'Hamburg--Germany',
+    'Milan': 'Milan--Italy',
 };
 
-const CITY_URLS = {
-    'Copenhagen':  'Copenhagen--Denmark',
-    'Paris':       'Paris--France',
-    'Amsterdam':   'Amsterdam--Netherlands',
-    'Berlin':      'Berlin--Germany',
-    'Barcelona':   'Barcelona--Spain',
-    'Madrid':      'Madrid--Spain',
-    'Rome':        'Rome--Italy',
-    'Vienna':      'Vienna--Austria',
-    'Prague':      'Prague--Czech-Republic',
-    'Lisbon':      'Lisbon--Portugal',
-    'Brussels':    'Brussels--Belgium',
-    'Stockholm':   'Stockholm--Sweden',
-    'Oslo':        'Oslo--Norway',
-    'Helsinki':    'Helsinki--Finland',
-    'Munich':      'Munich--Germany',
-    'Hamburg':     'Hamburg--Germany',
-    'Warsaw':      'Warsaw--Poland',
-    'Budapest':    'Budapest--Hungary',
-    'Athens':      'Athens--Greece',
-    'Milan':       'Milan--Italy',
-    'Zurich':      'Zurich--Switzerland',
-    'Dublin':      'Dublin--Ireland',
-    'Edinburgh':   'Edinburgh--United-Kingdom',
-    'Krakow':      'Krakow--Poland',
-    'Lyon':        'Lyon--France',
-    'Zagreb':      'Zagreb--Croatia',
-    'Ljubljana':   'Ljubljana--Slovenia',
-    'Riga':        'Riga--Latvia',
-    'Tallinn':     'Tallinn--Estonia',
-    'Vilnius':     'Vilnius--Lithuania',
+const CITIES = {
+    'Copenhagen': { ne_lat: 55.700, ne_lng: 12.620, sw_lat: 55.660, sw_lng: 12.540 },
+    'Paris':      { ne_lat: 48.950, ne_lng: 2.470,  sw_lat: 48.790, sw_lng: 2.220  },
+    'Berlin':     { ne_lat: 52.570, ne_lng: 13.480, sw_lat: 52.460, sw_lng: 13.320 },
+    'Amsterdam':  { ne_lat: 52.410, ne_lng: 4.970,  sw_lat: 52.340, sw_lng: 4.840  },
+    'Rome':       { ne_lat: 41.940, ne_lng: 12.540, sw_lat: 41.860, sw_lng: 12.430 },
+    'Barcelona':  { ne_lat: 41.430, ne_lng: 2.220,  sw_lat: 41.350, sw_lng: 2.100  },
+    'Vienna':     { ne_lat: 48.270, ne_lng: 16.450, sw_lat: 48.170, sw_lng: 16.300 },
+    'Prague':     { ne_lat: 50.130, ne_lng: 14.510, sw_lat: 50.040, sw_lng: 14.380 },
+    'Lisbon':     { ne_lat: 38.770, ne_lng: -9.080, sw_lat: 38.690, sw_lng: -9.220 },
+    'Dublin':     { ne_lat: 53.380, ne_lng: -6.190, sw_lat: 53.310, sw_lng: -6.320 },
+    'Brussels':   { ne_lat: 50.890, ne_lng: 4.430,  sw_lat: 50.820, sw_lng: 4.310  },
+    'Warsaw':     { ne_lat: 52.290, ne_lng: 21.080, sw_lat: 52.190, sw_lng: 20.930 },
+    'Budapest':   { ne_lat: 47.560, ne_lng: 19.100, sw_lat: 47.450, sw_lng: 18.980 },
+    'Stockholm':  { ne_lat: 59.370, ne_lng: 18.130, sw_lat: 59.290, sw_lng: 17.980 },
+    'Oslo':       { ne_lat: 59.960, ne_lng: 10.820, sw_lat: 59.880, sw_lng: 10.680 },
+    'Helsinki':   { ne_lat: 60.200, ne_lng: 25.050, sw_lat: 60.140, sw_lng: 24.900 },
+    'Zurich':     { ne_lat: 47.410, ne_lng: 8.600,  sw_lat: 47.340, sw_lng: 8.490  },
+    'Munich':     { ne_lat: 48.180, ne_lng: 11.650, sw_lat: 48.090, sw_lng: 11.490 },
+    'Hamburg':    { ne_lat: 53.620, ne_lng: 10.080, sw_lat: 53.520, sw_lng: 9.890  },
+    'Milan':      { ne_lat: 45.510, ne_lng: 9.250,  sw_lat: 45.430, sw_lng: 9.120  },
 };
+
+console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
 const coords = CITIES[city] || CITIES['Copenhagen'];
 const citySlug = CITY_URLS[city] || encodeURIComponent(city);
 const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
 
-console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
-
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
-    countryCode: 'DE', // German proxies — more reliable than FR
+    countryCode: 'FR',
 });
 
 const seenUrls = new Set();
 const seenCompanies = new Set();
+const results = [];
 
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
-    headless: true,
-    navigationTimeoutSecs: 90,
-    requestHandlerTimeoutSecs: 1800,
-    maxConcurrency: 1,
     maxRequestRetries: 2,
-    launchContext: {
-        launchOptions: {
-            args: ['--disable-gpu', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
-        },
-    },
-    requestHandler: async ({ page }) => {
+    requestHandlerTimeoutSecs: 3600,
+    maxConcurrency: 1,
+    requestHandler: async ({ page, log }) => {
         let pageNum = 0;
 
         while (pageNum < maxPages) {
             pageNum++;
             console.log(`\n--- Page ${pageNum} ---`);
-            console.log(`  URL: ${page.url().substring(0, 150)}`);
+            console.log(`  URL: ${page.url()}`);
 
-            // Wait for listing cards to render
-            await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 }).catch(() => {});
-            await sleep(8000);
+            // Wait for listing cards to appear
+            try {
+                await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 });
+            } catch {
+                console.log('  Timeout waiting for listings — skipping page');
+                break;
+            }
+            await new Promise(r => setTimeout(r, 8000));
 
-            // Find all "Business host" listing URLs on this page
-            const businessListingUrls = await page.evaluate(() => {
-                const results = [];
-                const allEls = [...document.querySelectorAll('*')];
-                for (const el of allEls) {
-                    if (el.childNodes.length <= 3 && el.textContent?.trim() === 'Business host') {
-                        let parent = el.parentElement;
-                        for (let i = 0; i < 15; i++) {
-                            if (!parent) break;
-                            const link = parent.querySelector('a[href*="/rooms/"]');
-                            if (link) {
-                                const href = link.getAttribute('href');
-                                const url = href.startsWith('http') ? href : `https://www.airbnb.com${href}`;
-                                results.push(url.split('?')[0]);
-                                break;
-                            }
-                            parent = parent.parentElement;
+            // Find all business host cards
+            const businessUrls = await page.evaluate(() => {
+                const cards = document.querySelectorAll('[data-testid="card-container"], [itemprop="itemListElement"], div[class*="g1qv1ctd"], div[class*="dir dir-ltr"]');
+                const urls = [];
+                for (const card of cards) {
+                    const text = card.innerText || '';
+                    if (text.includes('Business host') || text.includes('Business Host')) {
+                        const link = card.querySelector('a[href*="/rooms/"]');
+                        if (link) {
+                            const href = link.getAttribute('href');
+                            const match = href.match(/\/rooms\/(\d+)/);
+                            if (match) urls.push(`https://www.airbnb.com/rooms/${match[1]}`);
                         }
                     }
                 }
-                return [...new Set(results)];
+                // Fallback: search entire page HTML for business host near room links
+                if (urls.length === 0) {
+                    const html = document.body.innerHTML;
+                    const allLinks = document.querySelectorAll('a[href*="/rooms/"]');
+                    for (const link of allLinks) {
+                        const container = link.closest('div[class]');
+                        if (container) {
+                            const containerText = container.innerText || '';
+                            if (containerText.includes('Business host') || containerText.includes('Business Host')) {
+                                const href = link.getAttribute('href');
+                                const match = href.match(/\/rooms\/(\d+)/);
+                                if (match) urls.push(`https://www.airbnb.com/rooms/${match[1]}`);
+                            }
+                        }
+                    }
+                }
+                return [...new Set(urls)];
             });
 
-            const newUrls = businessListingUrls.filter(u => !seenUrls.has(u));
-            console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
+            const newUrls = businessUrls.filter(u => !seenUrls.has(u));
+            newUrls.forEach(u => seenUrls.add(u));
+            console.log(`  Found ${businessUrls.length} business hosts, ${newUrls.length} new`);
 
-            if (newUrls.length === 0 && pageNum > 2) {
-                console.log('  No new business hosts — stopping.');
-                break;
-            }
-
-            // Open each listing in a new tab — search page stays open
+            // Process each new business host listing
             for (const listingUrl of newUrls) {
-                seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
+                await new Promise(r => setTimeout(r, 2000));
 
                 const context = page.context();
                 const tab = await context.newPage();
 
                 try {
-                    const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
-                    const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    
-                    let loaded = false;
-                    try {
-                        await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-                        loaded = true;
-                    } catch (e) {
-                        console.log(`    ⚡ Page load timeout — skipping`);
-                    }
+                    // STEP 1: Load the listing page first to establish session
+                    await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    await new Promise(r => setTimeout(r, 3000));
 
-                    if (!loaded) { await tab.close(); continue; }
+                    // STEP 2: Navigate to modal URL once session is established
+                    const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
+                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    await new Promise(r => setTimeout(r, 4000));
 
-                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 10000 }).catch(() => {});
-                    await sleep(2000);
-
-                    // Debug: log what we actually got
-                    const tabUrl = tab.url();
-                    const bodyText = await tab.evaluate(() => document.body.innerText?.substring(0, 200) || '');
-                    console.log(`    URL: ${tabUrl.substring(0, 80)}`);
-                    console.log(`    Body: ${bodyText.substring(0, 100)}`);
+                    // Wait for modal dialog to appear
+                    await tab.waitForSelector('[role="dialog"]', { timeout: 15000 }).catch(() => {});
 
                     const tabTitle = await tab.title();
                     console.log(`    Tab: ${tabTitle.substring(0, 60)}`);
 
-                    let modalText = '';
-                    const selectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
-                    for (const sel of selectors) {
-                        try {
-                            const el = await tab.$(sel);
-                            if (el) {
-                                modalText = await tab.evaluate(el => el.innerText || '', el);
-                                if (modalText.length > 50) break;
-                            }
-                        } catch (e) {}
-                    }
-                    if (!modalText || modalText.length < 50) {
-                        modalText = await tab.evaluate(() => document.body.innerText || '');
-                    }
+                    // Extract details from modal using label-based matching
+                    const details = await tab.evaluate(() => {
+                        const dialog = document.querySelector('[role="dialog"]');
+                        const root = dialog || document;
+                        const text = root.innerText || '';
+                        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-                    let companyName = null, email = null, phone = null, address = null, registrationNumber = null;
-                    const lines = modalText.split('\n').map(l => l.trim()).filter(Boolean);
-                    for (const line of lines) {
-                        const colonIdx = line.indexOf(':');
-                        if (colonIdx === -1) continue;
-                        const label = line.substring(0, colonIdx).trim().toLowerCase();
-                        const value = line.substring(colonIdx + 1).trim();
-                        if (!value) continue;
-                        if (label.includes('business name') || label.includes('company') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
-                        else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat') || label.includes('siren') || label.includes('siret')) registrationNumber = value;
-                        else if (label.includes('email') || label === 'e-mail' || label === 'courriel') email = value;
-                        else if (label.includes('phone') || label === 'telefon' || label === 'téléphone' || label === 'tél' || label.includes('mobile')) phone = value;
-                        else if (label === 'address' || label === 'adresse') address = value;
-                    }
+                        let companyName = null, email = null, phone = null,
+                            registrationNumber = null, vatNumber = null,
+                            address = null;
 
-                    const pageText = await tab.evaluate(() => document.body.innerText || '');
-                    const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*[\d,]+\s*review/i)
-                        || pageText.match(/Rated\s+([\d.]+)\s+out of 5/i)
-                        || pageText.match(/(\d\.\d{1,2})\s*★/);
-                    const starRating = ratingMatch ? parseFloat(ratingMatch[1]) : null;
-                    const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*([\d,]+)\s*review/i)
-                        || pageText.match(/([\d,]+)\s+reviews?/i);
-                    const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/,/g, '')) : null;
+                        for (let i = 0; i < lines.length; i++) {
+                            const label = lines[i].toLowerCase();
+                            const val = lines[i + 1] || '';
+                            if (!companyName && (label.includes('business name') || label.includes('company name'))) companyName = val;
+                            if (!email && label.includes('email')) email = val;
+                            if (!phone && (label.includes('phone') || label.includes('telephone'))) phone = val;
+                            if (!registrationNumber && (label.includes('registration') || label.includes('company number') || label.includes('cvr') || label.includes('siret') || label.includes('handelsregister'))) registrationNumber = val;
+                            if (!vatNumber && (label.includes('vat') || label.includes('tax id') || label.includes('tva'))) vatNumber = val;
+                            if (!address && label.includes('address')) address = val;
+                        }
 
-                    if ((companyName || email || phone) && !seenCompanies.has(email || companyName)) {
-                        seenCompanies.add(email || companyName);
-                        console.log(`    ✅ ${companyName} | ${email} | ${phone}`);
-                        await Actor.pushData({
-                            url: listingUrl, city, companyName, email, phone,
-                            address, registrationNumber, starRating, reviewCount,
-                            isBusinessHost: true, scrapedAt: new Date().toISOString(),
-                        });
-                    } else if (companyName || email || phone) {
-                        console.log(`    ⏭️ Duplicate: ${companyName || email}`);
+                        // Fallback: grab company name from dialog heading
+                        if (!companyName && dialog) {
+                            const heading = dialog.querySelector('h1, h2, h3, [class*="title"]');
+                            if (heading) companyName = heading.innerText.trim();
+                        }
+
+                        // Extract rating and reviews from full page
+                        const fullText = document.body.innerText || '';
+                        const ratingMatch = fullText.match(/(\d+\.\d+)\s*(?:out of 5|\([\d,]+ reviews?\))/);
+                        const reviewMatch = fullText.match(/(\d[\d,]*)\s+reviews?/i);
+
+                        return {
+                            companyName,
+                            email,
+                            phone,
+                            registrationNumber,
+                            vatNumber,
+                            address,
+                            starRating: ratingMatch ? parseFloat(ratingMatch[1]) : null,
+                            reviewCount: reviewMatch ? parseInt(reviewMatch[1].replace(',', '')) : null,
+                        };
+                    });
+
+                    if (details.companyName) {
+                        if (!seenCompanies.has(details.companyName)) {
+                            seenCompanies.add(details.companyName);
+                            const record = {
+                                ...details,
+                                city,
+                                url: listingUrl,
+                                isBusinessHost: true,
+                            };
+                            results.push(record);
+                            await Actor.pushData(record);
+                            console.log(`    ✅ ${details.companyName} | ${details.email} | ${details.phone}`);
+                        } else {
+                            console.log(`    ⏭️ Duplicate company: ${details.companyName}`);
+                        }
                     } else {
                         console.log(`    ⚠️ No details extracted`);
                     }
                 } catch (err) {
-                    console.log(`    ❌ Error: ${err.message}`);
+                    console.log(`    ⚡ Error: ${err.message.substring(0, 80)}`);
                 } finally {
                     await tab.close();
-                    await sleep(2000); // pause between listings to avoid proxy overload
                 }
             }
 
-            // Pagination
-            console.log('  Finding next page...');
-            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-            await sleep(3000);
+            if (pageNum >= maxPages) break;
 
-            const navLinks = await page.$$('nav a[href]');
-            let nextLink = null;
-            for (const link of navLinks) {
-                const text = await link.textContent();
-                if (text?.trim() === String(pageNum + 1)) { nextLink = link; break; }
-            }
-            if (!nextLink && navLinks.length > 0) nextLink = navLinks[navLinks.length - 1];
+            // Navigate to next page
+            console.log(`  Finding next page...`);
+            try {
+                await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+                await new Promise(r => setTimeout(r, 2000));
 
-            if (!nextLink) { console.log('  No next page — done.'); break; }
-
-            const linkText = await nextLink.textContent();
-            console.log(`  Clicking: "${linkText?.trim()}"`);
-
-            const firstBefore = await page.evaluate(() => {
-                const l = document.querySelector('a[href*="/rooms/"]');
-                return l ? l.href : '';
-            });
-
-            await nextLink.click();
-
-            let changed = false;
-            for (let i = 0; i < 20; i++) {
-                await sleep(1000);
-                const firstAfter = await page.evaluate(() => {
-                    const l = document.querySelector('a[href*="/rooms/"]');
-                    return l ? l.href : '';
+                const nextUrl = await page.evaluate(() => {
+                    const nav = document.querySelector('nav');
+                    if (!nav) return null;
+                    const links = nav.querySelectorAll('a[href]');
+                    for (const link of links) {
+                        const t = (link.textContent || '').trim();
+                        if (t === '›' || t === '>' || t === 'Next' || t === '→') return link.href;
+                    }
+                    // Find current page number and get next
+                    const current = nav.querySelector('a[aria-current="page"], button[aria-current="page"]');
+                    if (current) {
+                        const currentNum = parseInt(current.textContent.trim());
+                        if (!isNaN(currentNum)) {
+                            for (const link of links) {
+                                if (parseInt(link.textContent.trim()) === currentNum + 1) return link.href;
+                            }
+                        }
+                    }
+                    return null;
                 });
-                if (firstAfter && firstAfter !== firstBefore) {
-                    changed = true;
-                    console.log('  ✅ New page loaded');
-                    break;
+
+                if (nextUrl) {
+                    const firstListingBefore = await page.evaluate(() => {
+                        const link = document.querySelector('a[href*="/rooms/"]');
+                        return link ? link.href : null;
+                    });
+
+                    await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    await new Promise(r => setTimeout(r, 5000));
+
+                    const firstListingAfter = await page.evaluate(() => {
+                        const link = document.querySelector('a[href*="/rooms/"]');
+                        return link ? link.href : null;
+                    });
+
+                    if (firstListingAfter === firstListingBefore) {
+                        console.log('  Page did not change — done.');
+                        break;
+                    }
+                    console.log(`  ✅ Navigated to next page`);
+                } else {
+                    // Fallback: try clicking the next button
+                    const clicked = await page.evaluate(() => {
+                        const nav = document.querySelector('nav');
+                        if (!nav) return false;
+                        const btns = nav.querySelectorAll('button, a');
+                        const last = btns[btns.length - 1];
+                        if (last) { last.click(); return true; }
+                        return false;
+                    });
+                    if (!clicked) {
+                        console.log('  No next page found — done.');
+                        break;
+                    }
+                    await new Promise(r => setTimeout(r, 5000));
                 }
+            } catch (err) {
+                console.log(`  Pagination error: ${err.message.substring(0, 80)}`);
+                break;
             }
-            if (!changed) { console.log('  Page did not change — done.'); break; }
-            await sleep(3000);
         }
 
-        console.log('\nDone!');
+        console.log(`\nDone! Found ${results.length} unique business hosts.`);
     },
 });
 
