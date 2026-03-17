@@ -139,7 +139,7 @@ const crawler = new PlaywrightCrawler({
                 try {
                     // STEP 1: Load the listing page first to establish session
                     await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-                    await new Promise(r => setTimeout(r, 3000));
+                    await new Promise(r => setTimeout(r, 5000));
 
                     // STEP 2: Navigate to modal URL once session is established
                     const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
@@ -152,7 +152,7 @@ const crawler = new PlaywrightCrawler({
                     const tabTitle = await tab.title();
                     console.log(`    Tab: ${tabTitle.substring(0, 60)}`);
 
-                    // Extract details from modal using label-based matching
+                    // Extract details from modal using colon-based parsing
                     const details = await tab.evaluate(() => {
                         const dialog = document.querySelector('[role="dialog"]');
                         const root = dialog || document;
@@ -163,15 +163,39 @@ const crawler = new PlaywrightCrawler({
                             registrationNumber = null, vatNumber = null,
                             address = null;
 
-                        for (let i = 0; i < lines.length; i++) {
-                            const label = lines[i].toLowerCase();
-                            const val = lines[i + 1] || '';
-                            if (!companyName && (label.includes('business name') || label.includes('company name'))) companyName = val;
-                            if (!email && label.includes('email')) email = val;
-                            if (!phone && (label.includes('phone') || label.includes('telephone'))) phone = val;
-                            if (!registrationNumber && (label.includes('registration') || label.includes('company number') || label.includes('cvr') || label.includes('siret') || label.includes('handelsregister'))) registrationNumber = val;
-                            if (!vatNumber && (label.includes('vat') || label.includes('tax id') || label.includes('tva'))) vatNumber = val;
-                            if (!address && label.includes('address')) address = val;
+                        // Helper: extract value from "Label: value" format OR next-line format
+                        const extract = (lines, labelPatterns) => {
+                            for (let i = 0; i < lines.length; i++) {
+                                const line = lines[i];
+                                const lower = line.toLowerCase();
+                                for (const pat of labelPatterns) {
+                                    if (lower.includes(pat)) {
+                                        // Check if value is on same line after colon
+                                        const colonIdx = line.indexOf(':');
+                                        if (colonIdx !== -1) {
+                                            const afterColon = line.substring(colonIdx + 1).trim();
+                                            if (afterColon.length > 1) return afterColon;
+                                        }
+                                        // Otherwise value is on next line
+                                        const next = (lines[i + 1] || '').trim();
+                                        if (next && !next.includes(':')) return next;
+                                    }
+                                }
+                            }
+                            return null;
+                        };
+
+                        companyName = extract(lines, ['business name', 'company name', 'nom de l\'entreprise', 'firmenname', 'nombre de empresa', 'ragione sociale']);
+                        email       = extract(lines, ['email', 'e-mail', 'courriel']);
+                        phone       = extract(lines, ['phone', 'telephone', 'téléphone', 'telefon', 'teléfono']);
+                        registrationNumber = extract(lines, ['registration number', 'company number', 'cvr', 'siret', 'siren', 'handelsregister', 'kvk', 'registro', 'partita iva', 'ico', 'nip']);
+                        vatNumber   = extract(lines, ['vat', 'tax id', 'tva', 'umsatzsteuer', 'cif']);
+                        address     = extract(lines, ['address', 'adresse', 'adresa', 'dirección', 'indirizzo']);
+
+                        // Skip generic registry descriptions as company names
+                        const genericNames = ['business registry', 'trade and company', 'handelsregister', 'registro mercantil', 'chambre de commerce'];
+                        if (companyName && genericNames.some(g => companyName.toLowerCase().includes(g))) {
+                            companyName = null;
                         }
 
                         // Fallback: grab company name from dialog heading
