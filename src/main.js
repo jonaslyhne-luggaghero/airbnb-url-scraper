@@ -155,8 +155,18 @@ const crawler = new PlaywrightCrawler({
                 try {
                     const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
-                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 15000 }).catch(() => {});
+                    
+                    let loaded = false;
+                    try {
+                        await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                        loaded = true;
+                    } catch (e) {
+                        console.log(`    ⚡ Page load timeout — skipping`);
+                    }
+
+                    if (!loaded) { await tab.close(); continue; }
+
+                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 8000 }).catch(() => {});
                     await sleep(2000);
 
                     const tabTitle = await tab.title();
