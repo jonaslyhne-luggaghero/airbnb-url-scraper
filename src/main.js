@@ -158,7 +158,7 @@ const crawler = new PlaywrightCrawler({
                     
                     let loaded = false;
                     try {
-                        await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                        await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
                         loaded = true;
                     } catch (e) {
                         console.log(`    ⚡ Page load timeout — skipping`);
@@ -166,7 +166,7 @@ const crawler = new PlaywrightCrawler({
 
                     if (!loaded) { await tab.close(); continue; }
 
-                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 8000 }).catch(() => {});
+                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 10000 }).catch(() => {});
                     await sleep(2000);
 
                     const tabTitle = await tab.title();
@@ -228,6 +228,7 @@ const crawler = new PlaywrightCrawler({
                     console.log(`    ❌ Error: ${err.message}`);
                 } finally {
                     await tab.close();
+                    await sleep(2000); // pause between listings to avoid proxy overload
                 }
             }
 
