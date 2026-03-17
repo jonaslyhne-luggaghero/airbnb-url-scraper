@@ -93,7 +93,7 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     headless: true,
     navigationTimeoutSecs: 90,
-    requestHandlerTimeoutSecs: 3600,
+    requestHandlerTimeoutSecs: 1800,
     maxConcurrency: 1,
     maxRequestRetries: 2,
     launchContext: {
@@ -112,7 +112,6 @@ const crawler = new PlaywrightCrawler({
             await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
             await sleep(4000);
 
-            // Find all "Business host" listing URLs on this page
             const businessListingUrls = await page.evaluate(() => {
                 const results = [];
                 const allEls = [...document.querySelectorAll('*')];
@@ -139,11 +138,10 @@ const crawler = new PlaywrightCrawler({
             console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
             if (newUrls.length === 0 && pageNum > 2) {
-                console.log('  No new business hosts — stopping.');
+                console.log('  No new business hosts on this page — stopping.');
                 break;
             }
 
-            // Process each listing in a new tab — two-step navigation to avoid homepage redirect
             for (const listingUrl of newUrls) {
                 seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
@@ -152,20 +150,15 @@ const crawler = new PlaywrightCrawler({
                 const tab = await context.newPage();
 
                 try {
-                    // STEP 1: Load the listing page first to establish session cookies
-                    await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-                    await sleep(3000);
-
-                    // STEP 2: Navigate to modal URL now that session is established
-                    const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-                    await tab.waitForSelector('[role="dialog"]', { timeout: 15000 }).catch(() => {});
+                    const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
+                    const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
+                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 15000 }).catch(() => {});
                     await sleep(2000);
 
                     const tabTitle = await tab.title();
                     console.log(`    Tab: ${tabTitle.substring(0, 60)}`);
 
-                    // Extract modal text
                     let modalText = '';
                     const selectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
                     for (const sel of selectors) {
@@ -181,41 +174,21 @@ const crawler = new PlaywrightCrawler({
                         modalText = await tab.evaluate(() => document.body.innerText || '');
                     }
 
-                    // Parse fields using colon-based extraction
-                    let companyName = null, email = null, phone = null,
-                        address = null, registrationNumber = null;
-
+                    let companyName = null, email = null, phone = null, address = null, registrationNumber = null;
                     const lines = modalText.split('\n').map(l => l.trim()).filter(Boolean);
-
-                    function extract(lines, patterns) {
-                        for (let i = 0; i < lines.length; i++) {
-                            const lower = lines[i].toLowerCase();
-                            for (const pat of patterns) {
-                                if (lower.includes(pat)) {
-                                    const ci = lines[i].indexOf(':');
-                                    if (ci !== -1) {
-                                        const after = lines[i].substring(ci + 1).trim();
-                                        if (after.length > 1) return after;
-                                    }
-                                    const next = (lines[i + 1] || '').trim();
-                                    if (next && next.length > 1) return next;
-                                }
-                            }
-                        }
-                        return null;
+                    for (const line of lines) {
+                        const colonIdx = line.indexOf(':');
+                        if (colonIdx === -1) continue;
+                        const label = line.substring(0, colonIdx).trim().toLowerCase();
+                        const value = line.substring(colonIdx + 1).trim();
+                        if (!value) continue;
+                        if (label.includes('business name') || label.includes('company') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
+                        else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat') || label.includes('siren') || label.includes('siret')) registrationNumber = value;
+                        else if (label.includes('email') || label === 'e-mail' || label === 'courriel') email = value;
+                        else if (label.includes('phone') || label === 'telefon' || label === 'téléphone' || label === 'tél' || label.includes('mobile')) phone = value;
+                        else if (label === 'address' || label === 'adresse') address = value;
                     }
 
-                    companyName     = extract(lines, ['business name', 'company name', "nom de l'entreprise", 'firmenname', 'nombre de empresa', 'ragione sociale', 'firmanavn']);
-                    email           = extract(lines, ['email', 'e-mail', 'courriel']);
-                    phone           = extract(lines, ['phone', 'telephone', 'téléphone', 'telefon', 'teléfono', 'mobile']);
-                    registrationNumber = extract(lines, ['registration number', 'company number', 'cvr', 'siret', 'siren', 'rcs', 'handelsregister', 'kvk', 'registro', 'ico', 'nip', 'vat']);
-                    address         = extract(lines, ['address', 'adresse', 'adresa', 'dirección', 'indirizzo']);
-
-                    // Skip generic registry descriptions
-                    const generic = ['business registry', 'trade and company', 'handelsregister', 'registro mercantil', 'chambre de commerce'];
-                    if (companyName && generic.some(g => companyName.toLowerCase().includes(g))) companyName = null;
-
-                    // Rating and reviews
                     const pageText = await tab.evaluate(() => document.body.innerText || '');
                     const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*[\d,]+\s*review/i)
                         || pageText.match(/Rated\s+([\d.]+)\s+out of 5/i)
@@ -225,9 +198,8 @@ const crawler = new PlaywrightCrawler({
                         || pageText.match(/([\d,]+)\s+reviews?/i);
                     const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/,/g, '')) : null;
 
-                    const key = email || companyName;
-                    if ((companyName || email || phone) && key && !seenCompanies.has(key)) {
-                        seenCompanies.add(key);
+                    if ((companyName || email || phone) && !seenCompanies.has(email || companyName)) {
+                        seenCompanies.add(email || companyName);
                         console.log(`    ✅ ${companyName} | ${email} | ${phone}`);
                         await Actor.pushData({
                             url: listingUrl, city, companyName, email, phone,
@@ -238,13 +210,12 @@ const crawler = new PlaywrightCrawler({
                         console.log(`    ⚠️ No details extracted`);
                     }
                 } catch (err) {
-                    console.log(`    ⚡ Error: ${err.message.substring(0, 100)}`);
+                    console.log(`    ❌ Error: ${err.message}`);
                 } finally {
                     await tab.close();
                 }
             }
 
-            // ── PAGINATION: click page number link via Playwright handle ──
             console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
@@ -259,7 +230,6 @@ const crawler = new PlaywrightCrawler({
                     break;
                 }
             }
-            // Fallback: last nav link (the > arrow)
             if (!nextLink && navLinks.length > 0) {
                 nextLink = navLinks[navLinks.length - 1];
             }
