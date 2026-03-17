@@ -169,13 +169,11 @@ const crawler = new PlaywrightCrawler({
                     await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 10000 }).catch(() => {});
                     await sleep(2000);
 
-                    // If modal not found, reload the page once and try again
-                    let modalFound = await tab.$('[role="dialog"], [data-testid="modal-container"]');
-                    if (!modalFound) {
-                        await tab.reload({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-                        await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 10000 }).catch(() => {});
-                        await sleep(2000);
-                    }
+                    // Debug: log what we actually got
+                    const tabUrl = tab.url();
+                    const bodyText = await tab.evaluate(() => document.body.innerText?.substring(0, 200) || '');
+                    console.log(`    URL: ${tabUrl.substring(0, 80)}`);
+                    console.log(`    Body: ${bodyText.substring(0, 100)}`);
 
                     const tabTitle = await tab.title();
                     console.log(`    Tab: ${tabTitle.substring(0, 60)}`);
