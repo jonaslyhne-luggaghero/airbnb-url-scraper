@@ -132,29 +132,6 @@ const crawler = new PlaywrightCrawler({
             newUrls.forEach(u => seenUrls.add(u));
             console.log(`  Found ${businessUrls.length} business hosts, ${newUrls.length} new`);
 
-            // Get next page URL before leaving the search page
-            const nextPageUrl = await page.evaluate(() => {
-                const nav = document.querySelector('nav');
-                if (!nav) return null;
-                const links = [...nav.querySelectorAll('a[href]')];
-                // Try to find "next" arrow link
-                for (const link of links) {
-                    const t = (link.textContent || '').trim();
-                    if (t === '›' || t === '>' || t === 'Next' || t === '→') return link.href;
-                }
-                // Find current page number, return link for current+1
-                const current = nav.querySelector('[aria-current="page"]');
-                if (current) {
-                    const n = parseInt(current.textContent.trim());
-                    if (!isNaN(n)) {
-                        for (const link of links) {
-                            if (parseInt((link.textContent || '').trim()) === n + 1) return link.href;
-                        }
-                    }
-                }
-                return null;
-            });
-
             // Process each business host listing
             for (const listingUrl of newUrls) {
                 console.log(`  Processing: ${listingUrl}`);
@@ -250,12 +227,35 @@ const crawler = new PlaywrightCrawler({
                 await new Promise(r => setTimeout(r, 2000));
             }
 
-            // Move to next page
+            // Go back to search page to grab next page URL
+            await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await new Promise(r => setTimeout(r, 6000));
+
+            const nextPageUrl = await page.evaluate(() => {
+                const nav = document.querySelector('nav');
+                if (!nav) return null;
+                const links = [...nav.querySelectorAll('a[href]')];
+                for (const link of links) {
+                    const t = (link.textContent || '').trim();
+                    if (t === '›' || t === '>' || t === 'Next' || t === '→') return link.href;
+                }
+                const current = nav.querySelector('[aria-current="page"]');
+                if (current) {
+                    const n = parseInt(current.textContent.trim());
+                    if (!isNaN(n)) {
+                        for (const link of links) {
+                            if (parseInt((link.textContent || '').trim()) === n + 1) return link.href;
+                        }
+                    }
+                }
+                return null;
+            });
+
             if (!nextPageUrl || pageNum >= maxPages) {
                 console.log('\n  No more pages — done.');
                 break;
             }
-            console.log(`  → Moving to page ${pageNum + 1}`);
+            console.log(`  → Moving to page ${pageNum + 1}: ${nextPageUrl.substring(0, 80)}...`);
             searchPageUrl = nextPageUrl;
         }
 
