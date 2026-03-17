@@ -68,57 +68,61 @@ const seenUrls = new Set();
 const seenCompanies = new Set();
 const results = [];
 
+// Helper: extract field from modal text using colon or next-line format
+function extractField(lines, labelPatterns) {
+    for (let i = 0; i < lines.length; i++) {
+        const lower = lines[i].toLowerCase();
+        for (const pat of labelPatterns) {
+            if (lower.includes(pat)) {
+                const colonIdx = lines[i].indexOf(':');
+                if (colonIdx !== -1) {
+                    const after = lines[i].substring(colonIdx + 1).trim();
+                    if (after.length > 1) return after;
+                }
+                const next = (lines[i + 1] || '').trim();
+                if (next && next.length > 1) return next;
+            }
+        }
+    }
+    return null;
+}
+
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxRequestRetries: 2,
     requestHandlerTimeoutSecs: 3600,
     maxConcurrency: 1,
-    requestHandler: async ({ page, log }) => {
+    requestHandler: async ({ page }) => {
         let pageNum = 0;
+        let searchPageUrl = startUrl;
 
         while (pageNum < maxPages) {
             pageNum++;
             console.log(`\n--- Page ${pageNum} ---`);
-            console.log(`  URL: ${page.url()}`);
 
-            // Wait for listing cards to appear
+            // Navigate to search page
+            await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
             try {
                 await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 });
             } catch {
                 console.log('  Timeout waiting for listings — skipping page');
                 break;
             }
-            await new Promise(r => setTimeout(r, 8000));
+            await new Promise(r => setTimeout(r, 6000));
+            console.log(`  URL: ${page.url()}`);
 
-            // Find all business host cards
+            // Collect business host URLs from this page
             const businessUrls = await page.evaluate(() => {
-                const cards = document.querySelectorAll('[data-testid="card-container"], [itemprop="itemListElement"], div[class*="g1qv1ctd"], div[class*="dir dir-ltr"]');
                 const urls = [];
-                for (const card of cards) {
-                    const text = card.innerText || '';
+                const allLinks = document.querySelectorAll('a[href*="/rooms/"]');
+                for (const link of allLinks) {
+                    const container = link.closest('div[class]') || link.parentElement;
+                    if (!container) continue;
+                    const text = container.innerText || '';
                     if (text.includes('Business host') || text.includes('Business Host')) {
-                        const link = card.querySelector('a[href*="/rooms/"]');
-                        if (link) {
-                            const href = link.getAttribute('href');
-                            const match = href.match(/\/rooms\/(\d+)/);
-                            if (match) urls.push(`https://www.airbnb.com/rooms/${match[1]}`);
-                        }
-                    }
-                }
-                // Fallback: search entire page HTML for business host near room links
-                if (urls.length === 0) {
-                    const html = document.body.innerHTML;
-                    const allLinks = document.querySelectorAll('a[href*="/rooms/"]');
-                    for (const link of allLinks) {
-                        const container = link.closest('div[class]');
-                        if (container) {
-                            const containerText = container.innerText || '';
-                            if (containerText.includes('Business host') || containerText.includes('Business Host')) {
-                                const href = link.getAttribute('href');
-                                const match = href.match(/\/rooms\/(\d+)/);
-                                if (match) urls.push(`https://www.airbnb.com/rooms/${match[1]}`);
-                            }
-                        }
+                        const href = link.getAttribute('href') || '';
+                        const match = href.match(/\/rooms\/(\d+)/);
+                        if (match) urls.push(`https://www.airbnb.com/rooms/${match[1]}`);
                     }
                 }
                 return [...new Set(urls)];
@@ -128,83 +132,81 @@ const crawler = new PlaywrightCrawler({
             newUrls.forEach(u => seenUrls.add(u));
             console.log(`  Found ${businessUrls.length} business hosts, ${newUrls.length} new`);
 
-            // Process each new business host listing
+            // Get next page URL before leaving the search page
+            const nextPageUrl = await page.evaluate(() => {
+                const nav = document.querySelector('nav');
+                if (!nav) return null;
+                const links = [...nav.querySelectorAll('a[href]')];
+                // Try to find "next" arrow link
+                for (const link of links) {
+                    const t = (link.textContent || '').trim();
+                    if (t === '›' || t === '>' || t === 'Next' || t === '→') return link.href;
+                }
+                // Find current page number, return link for current+1
+                const current = nav.querySelector('[aria-current="page"]');
+                if (current) {
+                    const n = parseInt(current.textContent.trim());
+                    if (!isNaN(n)) {
+                        for (const link of links) {
+                            if (parseInt((link.textContent || '').trim()) === n + 1) return link.href;
+                        }
+                    }
+                }
+                return null;
+            });
+
+            // Process each business host listing
             for (const listingUrl of newUrls) {
                 console.log(`  Processing: ${listingUrl}`);
-                await new Promise(r => setTimeout(r, 2000));
-
-                const context = page.context();
-                const tab = await context.newPage();
 
                 try {
-                    // STEP 1: Load the listing page first to establish session
-                    await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-                    await new Promise(r => setTimeout(r, 5000));
-
-                    // STEP 2: Navigate to modal URL once session is established
-                    const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    // Step 1: Navigate to listing page
+                    await page.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
                     await new Promise(r => setTimeout(r, 4000));
 
-                    // Wait for modal dialog to appear
-                    await tab.waitForSelector('[role="dialog"]', { timeout: 15000 }).catch(() => {});
+                    // Step 2: Navigate directly to modal URL
+                    const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
+                    await page.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+                    await new Promise(r => setTimeout(r, 4000));
 
-                    const tabTitle = await tab.title();
-                    console.log(`    Tab: ${tabTitle.substring(0, 60)}`);
+                    // Wait for modal dialog
+                    await page.waitForSelector('[role="dialog"]', { timeout: 15000 }).catch(() => {});
 
-                    // Extract details from modal using colon-based parsing
-                    const details = await tab.evaluate(() => {
+                    const title = await page.title();
+                    console.log(`    Tab: ${title.substring(0, 60)}`);
+
+                    // Extract fields
+                    const details = await page.evaluate(() => {
                         const dialog = document.querySelector('[role="dialog"]');
                         const root = dialog || document;
-                        const text = root.innerText || '';
+                        const text = (root.innerText || '');
                         const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-                        let companyName = null, email = null, phone = null,
-                            registrationNumber = null, vatNumber = null,
-                            address = null;
-
-                        // Helper: extract value from "Label: value" format OR next-line format
-                        const extract = (lines, labelPatterns) => {
+                        function extract(lines, patterns) {
                             for (let i = 0; i < lines.length; i++) {
-                                const line = lines[i];
-                                const lower = line.toLowerCase();
-                                for (const pat of labelPatterns) {
+                                const lower = lines[i].toLowerCase();
+                                for (const pat of patterns) {
                                     if (lower.includes(pat)) {
-                                        // Check if value is on same line after colon
-                                        const colonIdx = line.indexOf(':');
-                                        if (colonIdx !== -1) {
-                                            const afterColon = line.substring(colonIdx + 1).trim();
-                                            if (afterColon.length > 1) return afterColon;
+                                        const ci = lines[i].indexOf(':');
+                                        if (ci !== -1) {
+                                            const after = lines[i].substring(ci + 1).trim();
+                                            if (after.length > 1) return after;
                                         }
-                                        // Otherwise value is on next line
                                         const next = (lines[i + 1] || '').trim();
-                                        if (next && !next.includes(':')) return next;
+                                        if (next && next.length > 1) return next;
                                     }
                                 }
                             }
                             return null;
-                        };
-
-                        companyName = extract(lines, ['business name', 'company name', 'nom de l\'entreprise', 'firmenname', 'nombre de empresa', 'ragione sociale']);
-                        email       = extract(lines, ['email', 'e-mail', 'courriel']);
-                        phone       = extract(lines, ['phone', 'telephone', 'téléphone', 'telefon', 'teléfono']);
-                        registrationNumber = extract(lines, ['registration number', 'company number', 'cvr', 'siret', 'siren', 'handelsregister', 'kvk', 'registro', 'partita iva', 'ico', 'nip']);
-                        vatNumber   = extract(lines, ['vat', 'tax id', 'tva', 'umsatzsteuer', 'cif']);
-                        address     = extract(lines, ['address', 'adresse', 'adresa', 'dirección', 'indirizzo']);
-
-                        // Skip generic registry descriptions as company names
-                        const genericNames = ['business registry', 'trade and company', 'handelsregister', 'registro mercantil', 'chambre de commerce'];
-                        if (companyName && genericNames.some(g => companyName.toLowerCase().includes(g))) {
-                            companyName = null;
                         }
 
-                        // Fallback: grab company name from dialog heading
-                        if (!companyName && dialog) {
-                            const heading = dialog.querySelector('h1, h2, h3, [class*="title"]');
-                            if (heading) companyName = heading.innerText.trim();
-                        }
+                        const companyName      = extract(lines, ['business name', 'company name', "nom de l'entreprise", 'firmenname', 'nombre de empresa', 'ragione sociale']);
+                        const email            = extract(lines, ['email', 'e-mail', 'courriel']);
+                        const phone            = extract(lines, ['phone', 'telephone', 'téléphone', 'telefon', 'teléfono']);
+                        const registrationNum  = extract(lines, ['registration number', 'company number', 'cvr', 'siret', 'siren', 'handelsregister', 'kvk', 'registro', 'ico', 'nip']);
+                        const vatNumber        = extract(lines, ['vat', 'tax id', 'tva', 'umsatzsteuer', 'cif']);
+                        const address          = extract(lines, ['address', 'adresse', 'adresa', 'dirección', 'indirizzo']);
 
-                        // Extract rating and reviews from full page
                         const fullText = document.body.innerText || '';
                         const ratingMatch = fullText.match(/(\d+\.\d+)\s*(?:out of 5|\([\d,]+ reviews?\))/);
                         const reviewMatch = fullText.match(/(\d[\d,]*)\s+reviews?/i);
@@ -213,7 +215,7 @@ const crawler = new PlaywrightCrawler({
                             companyName,
                             email,
                             phone,
-                            registrationNumber,
+                            registrationNumber: registrationNum,
                             vatNumber,
                             address,
                             starRating: ratingMatch ? parseFloat(ratingMatch[1]) : null,
@@ -221,99 +223,40 @@ const crawler = new PlaywrightCrawler({
                         };
                     });
 
-                    if (details.companyName) {
-                        if (!seenCompanies.has(details.companyName)) {
-                            seenCompanies.add(details.companyName);
-                            const record = {
-                                ...details,
-                                city,
-                                url: listingUrl,
-                                isBusinessHost: true,
-                            };
+                    // Skip generic registry descriptions mistaken for company names
+                    const generic = ['business registry', 'trade and company', 'handelsregister', 'registro mercantil', 'chambre de commerce'];
+                    if (details.companyName && generic.some(g => details.companyName.toLowerCase().includes(g))) {
+                        details.companyName = null;
+                    }
+
+                    if (details.companyName || details.email || details.phone) {
+                        const key = details.companyName || details.email || listingUrl;
+                        if (!seenCompanies.has(key)) {
+                            seenCompanies.add(key);
+                            const record = { ...details, city, url: listingUrl, isBusinessHost: true };
                             results.push(record);
                             await Actor.pushData(record);
                             console.log(`    ✅ ${details.companyName} | ${details.email} | ${details.phone}`);
                         } else {
-                            console.log(`    ⏭️ Duplicate company: ${details.companyName}`);
+                            console.log(`    ⏭️ Duplicate: ${key}`);
                         }
                     } else {
                         console.log(`    ⚠️ No details extracted`);
                     }
                 } catch (err) {
-                    console.log(`    ⚡ Error: ${err.message.substring(0, 80)}`);
-                } finally {
-                    await tab.close();
+                    console.log(`    ⚡ Error: ${err.message.substring(0, 100)}`);
                 }
+
+                await new Promise(r => setTimeout(r, 2000));
             }
 
-            if (pageNum >= maxPages) break;
-
-            // Navigate to next page
-            console.log(`  Finding next page...`);
-            try {
-                await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-                await new Promise(r => setTimeout(r, 2000));
-
-                const nextUrl = await page.evaluate(() => {
-                    const nav = document.querySelector('nav');
-                    if (!nav) return null;
-                    const links = nav.querySelectorAll('a[href]');
-                    for (const link of links) {
-                        const t = (link.textContent || '').trim();
-                        if (t === '›' || t === '>' || t === 'Next' || t === '→') return link.href;
-                    }
-                    // Find current page number and get next
-                    const current = nav.querySelector('a[aria-current="page"], button[aria-current="page"]');
-                    if (current) {
-                        const currentNum = parseInt(current.textContent.trim());
-                        if (!isNaN(currentNum)) {
-                            for (const link of links) {
-                                if (parseInt(link.textContent.trim()) === currentNum + 1) return link.href;
-                            }
-                        }
-                    }
-                    return null;
-                });
-
-                if (nextUrl) {
-                    const firstListingBefore = await page.evaluate(() => {
-                        const link = document.querySelector('a[href*="/rooms/"]');
-                        return link ? link.href : null;
-                    });
-
-                    await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-                    await new Promise(r => setTimeout(r, 5000));
-
-                    const firstListingAfter = await page.evaluate(() => {
-                        const link = document.querySelector('a[href*="/rooms/"]');
-                        return link ? link.href : null;
-                    });
-
-                    if (firstListingAfter === firstListingBefore) {
-                        console.log('  Page did not change — done.');
-                        break;
-                    }
-                    console.log(`  ✅ Navigated to next page`);
-                } else {
-                    // Fallback: try clicking the next button
-                    const clicked = await page.evaluate(() => {
-                        const nav = document.querySelector('nav');
-                        if (!nav) return false;
-                        const btns = nav.querySelectorAll('button, a');
-                        const last = btns[btns.length - 1];
-                        if (last) { last.click(); return true; }
-                        return false;
-                    });
-                    if (!clicked) {
-                        console.log('  No next page found — done.');
-                        break;
-                    }
-                    await new Promise(r => setTimeout(r, 5000));
-                }
-            } catch (err) {
-                console.log(`  Pagination error: ${err.message.substring(0, 80)}`);
+            // Move to next page
+            if (!nextPageUrl || pageNum >= maxPages) {
+                console.log('\n  No more pages — done.');
                 break;
             }
+            console.log(`  → Moving to page ${pageNum + 1}`);
+            searchPageUrl = nextPageUrl;
         }
 
         console.log(`\nDone! Found ${results.length} unique business hosts.`);
