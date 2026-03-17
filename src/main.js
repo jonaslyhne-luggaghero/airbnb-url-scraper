@@ -68,50 +68,29 @@ const seenUrls = new Set();
 const seenCompanies = new Set();
 const results = [];
 
-// Helper: extract field from modal text using colon or next-line format
-function extractField(lines, labelPatterns) {
-    for (let i = 0; i < lines.length; i++) {
-        const lower = lines[i].toLowerCase();
-        for (const pat of labelPatterns) {
-            if (lower.includes(pat)) {
-                const colonIdx = lines[i].indexOf(':');
-                if (colonIdx !== -1) {
-                    const after = lines[i].substring(colonIdx + 1).trim();
-                    if (after.length > 1) return after;
-                }
-                const next = (lines[i + 1] || '').trim();
-                if (next && next.length > 1) return next;
-            }
-        }
-    }
-    return null;
-}
-
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     maxRequestRetries: 2,
     requestHandlerTimeoutSecs: 3600,
     maxConcurrency: 1,
     requestHandler: async ({ page }) => {
-        let pageNum = 0;
-        let searchPageUrl = startUrl;
+        let nextPageUrl = startUrl;
 
-        while (pageNum < maxPages) {
-            pageNum++;
+        for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
             console.log(`\n--- Page ${pageNum} ---`);
 
-            // Navigate to search page
-            await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            // Navigate to this search page
+            await page.goto(nextPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
             try {
                 await page.waitForSelector('a[href*="/rooms/"]', { timeout: 30000 });
             } catch {
-                console.log('  Timeout waiting for listings — skipping page');
+                console.log('  Timeout waiting for listings — stopping.');
                 break;
             }
             await new Promise(r => setTimeout(r, 6000));
             console.log(`  URL: ${page.url()}`);
 
-            // Collect business host URLs from this page
+            // Collect business host URLs
             const businessUrls = await page.evaluate(() => {
                 const urls = [];
                 const allLinks = document.querySelectorAll('a[href*="/rooms/"]');
@@ -132,32 +111,59 @@ const crawler = new PlaywrightCrawler({
             newUrls.forEach(u => seenUrls.add(u));
             console.log(`  Found ${businessUrls.length} business hosts, ${newUrls.length} new`);
 
-            // Process each business host listing
+            // Grab next page URL NOW before leaving search page
+            await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+            await new Promise(r => setTimeout(r, 2000));
+
+            const grabbedNext = await page.evaluate(() => {
+                const nav = document.querySelector('nav');
+                if (!nav) return null;
+                const links = [...nav.querySelectorAll('a[href]')];
+                // Log all nav link texts for debugging
+                const navInfo = links.map(l => l.textContent.trim() + '=' + l.href).join(' | ');
+                // Try arrow labels
+                for (const link of links) {
+                    const t = (link.textContent || '').trim();
+                    if (t === '›' || t === '>' || t === 'Next' || t === '→' || t === '»') return link.href;
+                }
+                // Find current page number, return next
+                const current = nav.querySelector('[aria-current="page"]');
+                if (current) {
+                    const n = parseInt(current.textContent.trim());
+                    if (!isNaN(n)) {
+                        for (const link of links) {
+                            if (parseInt((link.textContent || '').trim()) === n + 1) return link.href;
+                        }
+                    }
+                }
+                // Last resort: last nav link
+                const nonCurrent = links.filter(l => !l.getAttribute('aria-current'));
+                return nonCurrent.length > 0 ? nonCurrent[nonCurrent.length - 1].href : null;
+            });
+
+            console.log(`  Next page URL: ${grabbedNext ? grabbedNext.substring(0, 100) + '...' : 'none'}`);
+
+            // Process each business listing
             for (const listingUrl of newUrls) {
                 console.log(`  Processing: ${listingUrl}`);
-
                 try {
-                    // Step 1: Navigate to listing page
+                    // Step 1: load listing page to get session cookies
                     await page.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
                     await new Promise(r => setTimeout(r, 4000));
 
-                    // Step 2: Navigate directly to modal URL
+                    // Step 2: navigate to modal
                     const modalUrl = `${listingUrl}?modal=PROFESSIONAL_HOST_DETAILS`;
                     await page.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
                     await new Promise(r => setTimeout(r, 4000));
-
-                    // Wait for modal dialog
                     await page.waitForSelector('[role="dialog"]', { timeout: 15000 }).catch(() => {});
 
                     const title = await page.title();
                     console.log(`    Tab: ${title.substring(0, 60)}`);
 
-                    // Extract fields
                     const details = await page.evaluate(() => {
                         const dialog = document.querySelector('[role="dialog"]');
                         const root = dialog || document;
-                        const text = (root.innerText || '');
-                        const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+                        const lines = (root.innerText || '').split('\n').map(l => l.trim()).filter(Boolean);
 
                         function extract(lines, patterns) {
                             for (let i = 0; i < lines.length; i++) {
@@ -177,12 +183,12 @@ const crawler = new PlaywrightCrawler({
                             return null;
                         }
 
-                        const companyName      = extract(lines, ['business name', 'company name', "nom de l'entreprise", 'firmenname', 'nombre de empresa', 'ragione sociale']);
-                        const email            = extract(lines, ['email', 'e-mail', 'courriel']);
-                        const phone            = extract(lines, ['phone', 'telephone', 'téléphone', 'telefon', 'teléfono']);
-                        const registrationNum  = extract(lines, ['registration number', 'company number', 'cvr', 'siret', 'siren', 'handelsregister', 'kvk', 'registro', 'ico', 'nip']);
-                        const vatNumber        = extract(lines, ['vat', 'tax id', 'tva', 'umsatzsteuer', 'cif']);
-                        const address          = extract(lines, ['address', 'adresse', 'adresa', 'dirección', 'indirizzo']);
+                        const companyName     = extract(lines, ['business name', 'company name', "nom de l'entreprise", 'firmenname', 'nombre de empresa', 'ragione sociale']);
+                        const email           = extract(lines, ['email', 'e-mail', 'courriel']);
+                        const phone           = extract(lines, ['phone', 'telephone', 'téléphone', 'telefon', 'teléfono']);
+                        const registrationNum = extract(lines, ['registration number', 'company number', 'cvr', 'siret', 'siren', 'handelsregister', 'kvk', 'registro', 'ico', 'nip']);
+                        const vatNumber       = extract(lines, ['vat', 'tax id', 'tva', 'umsatzsteuer', 'cif']);
+                        const address         = extract(lines, ['address', 'adresse', 'adresa', 'dirección', 'indirizzo']);
 
                         const fullText = document.body.innerText || '';
                         const ratingMatch = fullText.match(/(\d+\.\d+)\s*(?:out of 5|\([\d,]+ reviews?\))/);
@@ -200,7 +206,6 @@ const crawler = new PlaywrightCrawler({
                         };
                     });
 
-                    // Skip generic registry descriptions mistaken for company names
                     const generic = ['business registry', 'trade and company', 'handelsregister', 'registro mercantil', 'chambre de commerce'];
                     if (details.companyName && generic.some(g => details.companyName.toLowerCase().includes(g))) {
                         details.companyName = null;
@@ -223,40 +228,16 @@ const crawler = new PlaywrightCrawler({
                 } catch (err) {
                     console.log(`    ⚡ Error: ${err.message.substring(0, 100)}`);
                 }
-
                 await new Promise(r => setTimeout(r, 2000));
             }
 
-            // Go back to search page to grab next page URL
-            await page.goto(searchPageUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-            await new Promise(r => setTimeout(r, 6000));
-
-            const nextPageUrl = await page.evaluate(() => {
-                const nav = document.querySelector('nav');
-                if (!nav) return null;
-                const links = [...nav.querySelectorAll('a[href]')];
-                for (const link of links) {
-                    const t = (link.textContent || '').trim();
-                    if (t === '›' || t === '>' || t === 'Next' || t === '→') return link.href;
-                }
-                const current = nav.querySelector('[aria-current="page"]');
-                if (current) {
-                    const n = parseInt(current.textContent.trim());
-                    if (!isNaN(n)) {
-                        for (const link of links) {
-                            if (parseInt((link.textContent || '').trim()) === n + 1) return link.href;
-                        }
-                    }
-                }
-                return null;
-            });
-
-            if (!nextPageUrl || pageNum >= maxPages) {
-                console.log('\n  No more pages — done.');
+            // Stop or advance
+            if (!grabbedNext || grabbedNext === nextPageUrl) {
+                console.log('\n  No next page found — done.');
                 break;
             }
-            console.log(`  → Moving to page ${pageNum + 1}: ${nextPageUrl.substring(0, 80)}...`);
-            searchPageUrl = nextPageUrl;
+            nextPageUrl = grabbedNext;
+            console.log(`  → Moving to page ${pageNum + 1}`);
         }
 
         console.log(`\nDone! Found ${results.length} unique business hosts.`);
