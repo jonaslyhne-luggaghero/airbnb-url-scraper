@@ -227,35 +227,39 @@ const crawler = new PlaywrightCrawler({
                 }
             }
 
-            // PAGINATION
+            // PAGINATION - exact approach from working 82-lead version
             console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
+
+            const navLinks = await page.$('nav a[href]');
+            let nextLink = null;
+
+            for (const link of navLinks) {
+                const text = await link.textContent();
+                if (text?.trim() === String(pageNum + 1)) {
+                    nextLink = link;
+                    break;
+                }
+            }
+            if (!nextLink && navLinks.length > 0) {
+                nextLink = navLinks[navLinks.length - 1];
+            }
+
+            if (!nextLink) {
+                console.log('  No next page link — done.');
+                break;
+            }
+
+            const linkText = await nextLink.textContent();
+            console.log(`  Clicking: "${linkText?.trim()}"`);
 
             const firstBefore = await page.evaluate(() => {
                 const l = document.querySelector('a[href*="/rooms/"]');
                 return l ? l.href : '';
             });
 
-            const clicked = await page.evaluate((targetText) => {
-                const nav = document.querySelector('nav');
-                if (!nav) return false;
-                const links = [...nav.querySelectorAll('a[href]')];
-                for (const link of links) {
-                    if (link.textContent?.trim() === targetText) {
-                        link.click();
-                        return true;
-                    }
-                }
-                if (links.length > 0) { links[links.length - 1].click(); return true; }
-                return false;
-            }, String(pageNum + 1));
-
-            if (!clicked) {
-                console.log('  No next page link — done.');
-                break;
-            }
-            console.log(`  Clicking: "${pageNum + 1}"`);
+            await nextLink.click();
 
             let changed = false;
             for (let i = 0; i < 20; i++) {
