@@ -75,12 +75,6 @@ const CITY_URLS = {
     'Vilnius':     'Vilnius--Lithuania',
 };
 
-const coords = CITIES[city] || CITIES['Copenhagen'];
-const citySlug = CITY_URLS[city] || encodeURIComponent(city);
-const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
-
-console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
-
 const CITY_PROXY_COUNTRIES = {
     'Copenhagen': 'DK', 'Paris': 'FR', 'Amsterdam': 'NL', 'Berlin': 'DE',
     'Barcelona': 'ES', 'Madrid': 'ES', 'Rome': 'IT', 'Vienna': 'AT',
@@ -91,6 +85,12 @@ const CITY_PROXY_COUNTRIES = {
     'Lyon': 'FR', 'Zagreb': 'HR', 'Ljubljana': 'SI', 'Riga': 'LV',
     'Tallinn': 'EE', 'Vilnius': 'LT',
 };
+
+const coords = CITIES[city] || CITIES['Copenhagen'];
+const citySlug = CITY_URLS[city] || encodeURIComponent(city);
+const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
+
+console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
@@ -104,7 +104,7 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     headless: true,
     navigationTimeoutSecs: 90,
-    requestHandlerTimeoutSecs: 1800,
+    requestHandlerTimeoutSecs: 3600,
     maxConcurrency: 1,
     maxRequestRetries: 2,
     launchContext: {
@@ -193,11 +193,11 @@ const crawler = new PlaywrightCrawler({
                         const label = line.substring(0, colonIdx).trim().toLowerCase();
                         const value = line.substring(colonIdx + 1).trim();
                         if (!value) continue;
-                        if (label.includes('business name') || label.includes('company') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
-                        else if (label.includes('registration') || label.includes('cvr') || label.includes('rcs') || label.includes('vat') || label.includes('siren') || label.includes('siret')) registrationNumber = value;
-                        else if (label.includes('email') || label === 'e-mail' || label === 'courriel') email = value;
-                        else if (label.includes('phone') || label === 'telefon' || label === 'téléphone' || label === 'tél' || label.includes('mobile')) phone = value;
-                        else if (label === 'address' || label === 'adresse') address = value;
+                        if (label.includes('business name') || label.includes('company') || label.includes('bedrijfsnaam') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
+                        else if (label.includes('registration') || label.includes('kvk') || label.includes('cvr') || label.includes('rcs') || label.includes('vat') || label.includes('siren') || label.includes('siret') || label.includes('handelsregister')) registrationNumber = value;
+                        else if (label.includes('email') || label === 'e-mail' || label === 'courriel' || label === 'e-mailadres') email = value;
+                        else if (label.includes('phone') || label === 'telefon' || label === 'téléphone' || label === 'tél' || label.includes('mobile') || label === 'telefoonnummer') phone = value;
+                        else if (label === 'address' || label === 'adresse' || label === 'adres') address = value;
                     }
 
                     const pageText = await tab.evaluate(() => document.body.innerText || '');
@@ -227,38 +227,16 @@ const crawler = new PlaywrightCrawler({
                 }
             }
 
+            // PAGINATION
             console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
-
-            const navLinks = await page.$('nav a[href]');
-            let nextLink = null;
-
-            for (const link of navLinks) {
-                const text = await link.textContent();
-                if (text?.trim() === String(pageNum + 1)) {
-                    nextLink = link;
-                    break;
-                }
-            }
-            if (!nextLink && navLinks.length > 0) {
-                nextLink = navLinks[navLinks.length - 1];
-            }
-
-            if (!nextLink) {
-                console.log('  No next page link — done.');
-                break;
-            }
-
-            const linkText = await nextLink.textContent();
-            console.log(`  Clicking: "${linkText?.trim()}"`);
 
             const firstBefore = await page.evaluate(() => {
                 const l = document.querySelector('a[href*="/rooms/"]');
                 return l ? l.href : '';
             });
 
-            // Use evaluate click to avoid stale element handle timeouts
             const clicked = await page.evaluate((targetText) => {
                 const nav = document.querySelector('nav');
                 if (!nav) return false;
@@ -269,7 +247,6 @@ const crawler = new PlaywrightCrawler({
                         return true;
                     }
                 }
-                // Fallback: click last nav link
                 if (links.length > 0) { links[links.length - 1].click(); return true; }
                 return false;
             }, String(pageNum + 1));
@@ -278,6 +255,9 @@ const crawler = new PlaywrightCrawler({
                 console.log('  No next page link — done.');
                 break;
             }
+            console.log(`  Clicking: "${pageNum + 1}"`);
+
+            let changed = false;
             for (let i = 0; i < 20; i++) {
                 await sleep(1000);
                 const firstAfter = await page.evaluate(() => {
