@@ -231,7 +231,7 @@ const crawler = new PlaywrightCrawler({
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
 
-            const navLinks = await page.$$('nav a[href]');
+            const navLinks = await page.$('nav a[href]');
             let nextLink = null;
 
             for (const link of navLinks) {
@@ -258,9 +258,26 @@ const crawler = new PlaywrightCrawler({
                 return l ? l.href : '';
             });
 
-            await nextLink.click();
+            // Use evaluate click to avoid stale element handle timeouts
+            const clicked = await page.evaluate((targetText) => {
+                const nav = document.querySelector('nav');
+                if (!nav) return false;
+                const links = [...nav.querySelectorAll('a[href]')];
+                for (const link of links) {
+                    if (link.textContent?.trim() === targetText) {
+                        link.click();
+                        return true;
+                    }
+                }
+                // Fallback: click last nav link
+                if (links.length > 0) { links[links.length - 1].click(); return true; }
+                return false;
+            }, String(pageNum + 1));
 
-            let changed = false;
+            if (!clicked) {
+                console.log('  No next page link — done.');
+                break;
+            }
             for (let i = 0; i < 20; i++) {
                 await sleep(1000);
                 const firstAfter = await page.evaluate(() => {
