@@ -81,13 +81,24 @@ const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${coords.ne_
 
 console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
 
+const CITY_PROXY_COUNTRIES = {
+    'Copenhagen': 'DK', 'Paris': 'FR', 'Amsterdam': 'NL', 'Berlin': 'DE',
+    'Barcelona': 'ES', 'Madrid': 'ES', 'Rome': 'IT', 'Vienna': 'AT',
+    'Prague': 'CZ', 'Lisbon': 'PT', 'Brussels': 'BE', 'Stockholm': 'SE',
+    'Oslo': 'NO', 'Helsinki': 'FI', 'Munich': 'DE', 'Hamburg': 'DE',
+    'Warsaw': 'PL', 'Budapest': 'HU', 'Athens': 'GR', 'Milan': 'IT',
+    'Zurich': 'CH', 'Dublin': 'IE', 'Edinburgh': 'GB', 'Krakow': 'PL',
+    'Lyon': 'FR', 'Zagreb': 'HR', 'Ljubljana': 'SI', 'Riga': 'LV',
+    'Tallinn': 'EE', 'Vilnius': 'LT',
+};
+
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
-    countryCode: 'FR',
+    countryCode: CITY_PROXY_COUNTRIES[city] || 'FR',
 });
 
 const seenUrls = new Set();
-const seenCompanies = new Set(); // prevent duplicate company names
+const seenCompanies = new Set();
 
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
@@ -109,11 +120,9 @@ const crawler = new PlaywrightCrawler({
             console.log(`\n--- Page ${pageNum} ---`);
             console.log(`  URL: ${page.url().substring(0, 150)}`);
 
-            // Wait for listing cards to render
             await page.waitForSelector('a[href*="/rooms/"]', { timeout: 20000 }).catch(() => {});
             await sleep(4000);
 
-            // Find all "Business host" listing URLs on this page
             const businessListingUrls = await page.evaluate(() => {
                 const results = [];
                 const allEls = [...document.querySelectorAll('*')];
@@ -144,7 +153,6 @@ const crawler = new PlaywrightCrawler({
                 break;
             }
 
-            // Open each listing in a new tab
             for (const listingUrl of newUrls) {
                 seenUrls.add(listingUrl);
                 console.log(`  Processing: ${listingUrl}`);
@@ -192,7 +200,6 @@ const crawler = new PlaywrightCrawler({
                         else if (label === 'address' || label === 'adresse') address = value;
                     }
 
-                    // Get rating and reviews — check multiple patterns
                     const pageText = await tab.evaluate(() => document.body.innerText || '');
                     const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*[\d,]+\s*review/i)
                         || pageText.match(/Rated\s+([\d.]+)\s+out of 5/i)
@@ -220,7 +227,6 @@ const crawler = new PlaywrightCrawler({
                 }
             }
 
-            // ── PAGINATION: click page number link directly ──────
             console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
