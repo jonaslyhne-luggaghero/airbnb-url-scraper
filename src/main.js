@@ -163,7 +163,13 @@ const crawler = new PlaywrightCrawler({
                 try {
                     const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
-                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 90000 });
+
+                    // Step 1: load listing page to establish session
+                    await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+                    await sleep(2000);
+
+                    // Step 2: navigate to modal
+                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
                     await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 15000 }).catch(() => {});
                     await sleep(2000);
 
