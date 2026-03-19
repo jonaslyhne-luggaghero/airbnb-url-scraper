@@ -104,7 +104,7 @@ const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     headless: true,
     navigationTimeoutSecs: 90,
-    requestHandlerTimeoutSecs: 3600,
+    requestHandlerTimeoutSecs: 1800,
     maxConcurrency: 1,
     maxRequestRetries: 2,
     launchContext: {
@@ -227,12 +227,12 @@ const crawler = new PlaywrightCrawler({
                 }
             }
 
-            // PAGINATION - exact approach from working 82-lead version
+            // PAGINATION — exact approach from working 82-lead version
             console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
 
-            const navLinks = await page.$('nav a[href]');
+            const navLinks = await page.$$('nav a[href]');
             let nextLink = null;
 
             for (const link of navLinks) {
