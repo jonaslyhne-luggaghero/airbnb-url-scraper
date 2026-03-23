@@ -86,8 +86,7 @@ const CITY_PROXY_COUNTRIES = {
     'Tallinn': 'EE', 'Vilnius': 'LT',
 };
 
-// Multi-zone definitions for large cities
-// Each zone covers a different neighbourhood, giving its own 15 pages of unique listings
+// Multi-zone definitions — each zone gets its own set of pages, maximising unique listings
 const CITY_ZONES = {
     'Paris': [
         { ne_lat: 48.950, ne_lng: 2.420, sw_lat: 48.880, sw_lng: 2.290 }, // NW: 16,17,8 arr
@@ -97,6 +96,48 @@ const CITY_ZONES = {
         { ne_lat: 48.880, ne_lng: 2.470, sw_lat: 48.830, sw_lng: 2.380 }, // E center: 11,20 arr
         { ne_lat: 48.830, ne_lng: 2.420, sw_lat: 48.790, sw_lng: 2.280 }, // SW: 14,15 arr
         { ne_lat: 48.830, ne_lng: 2.470, sw_lat: 48.790, sw_lng: 2.350 }, // SE: 12,13 arr
+    ],
+    'Barcelona': [
+        { ne_lat: 41.430, ne_lng: 2.185, sw_lat: 41.380, sw_lng: 2.110 }, // W: Eixample Esquerra, Poble Sec, Sants
+        { ne_lat: 41.430, ne_lng: 2.230, sw_lat: 41.380, sw_lng: 2.160 }, // E: Eixample Dreta, Gràcia, Sagrada Família
+        { ne_lat: 41.380, ne_lng: 2.200, sw_lat: 41.340, sw_lng: 2.110 }, // SW: Montjuïc, Sant Antoni, Barri Gòtic
+        { ne_lat: 41.380, ne_lng: 2.230, sw_lat: 41.340, sw_lng: 2.170 }, // SE: Born, Barceloneta, Poblenou
+        { ne_lat: 41.430, ne_lng: 2.155, sw_lat: 41.375, sw_lng: 2.085 }, // Far W: Les Corts, Camp Nou
+    ],
+    'Berlin': [
+        { ne_lat: 52.570, ne_lng: 13.420, sw_lat: 52.510, sw_lng: 13.320 }, // W: Charlottenburg, Wilmersdorf
+        { ne_lat: 52.570, ne_lng: 13.480, sw_lat: 52.510, sw_lng: 13.390 }, // NE: Prenzlauer Berg, Pankow
+        { ne_lat: 52.510, ne_lng: 13.430, sw_lat: 52.460, sw_lng: 13.320 }, // SW: Schöneberg, Tempelhof
+        { ne_lat: 52.510, ne_lng: 13.480, sw_lat: 52.460, sw_lng: 13.390 }, // SE: Kreuzberg, Neukölln, Treptow
+        { ne_lat: 52.540, ne_lng: 13.410, sw_lat: 52.490, sw_lng: 13.340 }, // Center: Mitte, Tiergarten
+    ],
+    'Amsterdam': [
+        { ne_lat: 52.420, ne_lng: 4.940, sw_lat: 52.370, sw_lng: 4.870 }, // Center: Canal ring, Jordaan
+        { ne_lat: 52.420, ne_lng: 4.970, sw_lat: 52.370, sw_lng: 4.910 }, // E: De Pijp, Oost
+        { ne_lat: 52.390, ne_lng: 4.930, sw_lat: 52.330, sw_lng: 4.840 }, // S: Oud-Zuid, Buitenveldert
+    ],
+    'Madrid': [
+        { ne_lat: 40.460, ne_lng: -3.670, sw_lat: 40.410, sw_lng: -3.760 }, // W: Argüelles, Moncloa
+        { ne_lat: 40.460, ne_lng: -3.640, sw_lat: 40.410, sw_lng: -3.700 }, // Center: Sol, Malasaña, Chueca
+        { ne_lat: 40.410, ne_lng: -3.660, sw_lat: 40.370, sw_lng: -3.760 }, // SW: Carabanchel, Latina
+        { ne_lat: 40.410, ne_lng: -3.640, sw_lat: 40.370, sw_lng: -3.700 }, // SE: Lavapiés, Retiro
+    ],
+    'Rome': [
+        { ne_lat: 41.950, ne_lng: 12.510, sw_lat: 41.890, sw_lng: 12.420 }, // W: Trastevere, Vatican
+        { ne_lat: 41.950, ne_lng: 12.550, sw_lat: 41.890, sw_lng: 12.470 }, // NE: Borghese, Parioli
+        { ne_lat: 41.890, ne_lng: 12.510, sw_lat: 41.840, sw_lng: 12.420 }, // SW: Testaccio, EUR
+        { ne_lat: 41.890, ne_lng: 12.550, sw_lat: 41.840, sw_lng: 12.470 }, // SE: Colosseo, Appio
+    ],
+    'Milan': [
+        { ne_lat: 45.520, ne_lng: 9.210, sw_lat: 45.460, sw_lng: 9.120 }, // W: Brera, Magenta
+        { ne_lat: 45.520, ne_lng: 9.270, sw_lat: 45.460, sw_lng: 9.180 }, // E: Porta Venezia, Isola
+        { ne_lat: 45.460, ne_lng: 9.230, sw_lat: 45.420, sw_lng: 9.120 }, // SW: Navigli, Bocconi
+        { ne_lat: 45.460, ne_lng: 9.270, sw_lat: 45.420, sw_lng: 9.190 }, // SE: Porta Romana, Vigentino
+    ],
+    'Lisbon': [
+        { ne_lat: 38.780, ne_lng: -9.120, sw_lat: 38.720, sw_lng: -9.210 }, // W: Belém, Alcântara
+        { ne_lat: 38.780, ne_lng: -9.090, sw_lat: 38.720, sw_lng: -9.150 }, // Center: Chiado, Bairro Alto
+        { ne_lat: 38.730, ne_lng: -9.110, sw_lat: 38.680, sw_lng: -9.180 }, // S: Mouraria, Alfama
     ],
 };
 
@@ -119,6 +160,23 @@ const startUrls = zones.map((z, i) => ({
     userData: { zoneIndex: i + 1, totalZones: zones.length },
 }));
 
+// Helper: navigate to a URL with 1 automatic retry on timeout
+async function gotoWithRetry(tab, url, options, retries = 1) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            await tab.goto(url, options);
+            return;
+        } catch (err) {
+            if (attempt < retries && err.message.includes('Timeout')) {
+                console.log(`    ⏱ Timeout on attempt ${attempt + 1}, retrying...`);
+                await sleep(3000);
+            } else {
+                throw err;
+            }
+        }
+    }
+}
+
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     headless: true,
@@ -133,7 +191,7 @@ const crawler = new PlaywrightCrawler({
     },
     requestHandler: async ({ page, request }) => {
         const { zoneIndex, totalZones } = request.userData || { zoneIndex: 1, totalZones: 1 };
-        console.log(`\n═══ Zone ${zoneIndex}/${totalZones} ═══`);
+        console.log(`\n═══ Zone ${zoneIndex}/${totalZones} ═══\n`);
 
         let pageNum = 0;
 
@@ -187,9 +245,10 @@ const crawler = new PlaywrightCrawler({
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
 
                     // Two-step: load listing first to establish session, then modal
-                    await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    // Both steps use gotoWithRetry for 1 automatic retry on timeout
+                    await gotoWithRetry(tab, listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
                     await sleep(1500);
-                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    await gotoWithRetry(tab, modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
                     await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 12000 }).catch(() => {});
                     await sleep(2000);
 
