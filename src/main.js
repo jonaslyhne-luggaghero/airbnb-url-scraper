@@ -86,11 +86,27 @@ const CITY_PROXY_COUNTRIES = {
     'Tallinn': 'EE', 'Vilnius': 'LT',
 };
 
-const coords = CITIES[city] || CITIES['Copenhagen'];
-const citySlug = CITY_URLS[city] || encodeURIComponent(city);
-const startUrl = `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${coords.ne_lat}&ne_lng=${coords.ne_lng}&sw_lat=${coords.sw_lat}&sw_lng=${coords.sw_lng}&zoom=12`;
+// Multi-zone definitions for large cities
+// Each zone covers a different neighbourhood, giving its own 15 pages of unique listings
+const CITY_ZONES = {
+    'Paris': [
+        { ne_lat: 48.895, ne_lng: 2.370, sw_lat: 48.850, sw_lng: 2.290 }, // 8,9,17,18 arr
+        { ne_lat: 48.895, ne_lng: 2.410, sw_lat: 48.850, sw_lng: 2.330 }, // 10,19 arr
+        { ne_lat: 48.895, ne_lng: 2.470, sw_lat: 48.850, sw_lng: 2.390 }, // 20,11 arr
+        { ne_lat: 48.855, ne_lng: 2.370, sw_lat: 48.820, sw_lng: 2.290 }, // 6,7,15 arr
+        { ne_lat: 48.855, ne_lng: 2.410, sw_lat: 48.820, sw_lng: 2.330 }, // 1,2,3,4 arr
+        { ne_lat: 48.855, ne_lng: 2.470, sw_lat: 48.820, sw_lng: 2.390 }, // 12,13 arr
+        { ne_lat: 48.820, ne_lng: 2.410, sw_lat: 48.790, sw_lng: 2.290 }, // 14,15 arr
+        { ne_lat: 48.820, ne_lng: 2.470, sw_lat: 48.790, sw_lng: 2.330 }, // suburbs SE
+        { ne_lat: 48.950, ne_lng: 2.470, sw_lat: 48.895, sw_lng: 2.220 }, // suburbs N
+    ],
+};
 
-console.log(`Searching ${city} for business hosts (max ${maxPages} pages)...`);
+const baseCoords = CITIES[city] || CITIES['Copenhagen'];
+const zones = CITY_ZONES[city] || [baseCoords];
+const citySlug = CITY_URLS[city] || encodeURIComponent(city);
+
+console.log(`Searching ${city} across ${zones.length} zone(s), max ${maxPages} pages each...`);
 
 const proxyConfiguration = await Actor.createProxyConfiguration({
     groups: ['RESIDENTIAL'],
@@ -100,11 +116,16 @@ const proxyConfiguration = await Actor.createProxyConfiguration({
 const seenUrls = new Set();
 const seenCompanies = new Set();
 
+const startUrls = zones.map((z, i) => ({
+    url: `https://www.airbnb.com/s/${citySlug}/homes?ne_lat=${z.ne_lat}&ne_lng=${z.ne_lng}&sw_lat=${z.sw_lat}&sw_lng=${z.sw_lng}&zoom=13`,
+    userData: { zoneIndex: i + 1, totalZones: zones.length },
+}));
+
 const crawler = new PlaywrightCrawler({
     proxyConfiguration,
     headless: true,
     navigationTimeoutSecs: 90,
-    requestHandlerTimeoutSecs: 1800,
+    requestHandlerTimeoutSecs: 3600,
     maxConcurrency: 1,
     maxRequestRetries: 2,
     launchContext: {
@@ -112,7 +133,10 @@ const crawler = new PlaywrightCrawler({
             args: ['--disable-gpu', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
         },
     },
-    requestHandler: async ({ page }) => {
+    requestHandler: async ({ page, request }) => {
+        const { zoneIndex, totalZones } = request.userData || { zoneIndex: 1, totalZones: 1 };
+        console.log(`\n═══ Zone ${zoneIndex}/${totalZones} ═══`);
+
         let pageNum = 0;
 
         while (pageNum < maxPages) {
@@ -149,7 +173,7 @@ const crawler = new PlaywrightCrawler({
             console.log(`  Found ${businessListingUrls.length} business hosts, ${newUrls.length} new`);
 
             if (newUrls.length === 0 && pageNum > 2) {
-                console.log('  No new business hosts on this page — stopping.');
+                console.log('  No new business hosts — stopping this zone.');
                 break;
             }
 
@@ -164,8 +188,7 @@ const crawler = new PlaywrightCrawler({
                     const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
 
-                    // Always two-step: load listing first to establish session, then modal
-                    // Use shorter timeouts so slow proxies fail fast rather than hanging
+                    // Two-step: load listing first to establish session, then modal
                     await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
                     await sleep(1500);
                     await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -226,13 +249,13 @@ const crawler = new PlaywrightCrawler({
                         console.log(`    ⚠️ No details extracted`);
                     }
                 } catch (err) {
-                    console.log(`    ❌ Error: ${err.message}`);
+                    console.log(`    ❌ Error: ${err.message.substring(0, 100)}`);
                 } finally {
                     await tab.close();
                 }
             }
 
-            // PAGINATION — exact approach from working 82-lead version
+            // PAGINATION
             console.log('  Finding next page...');
             await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
             await sleep(3000);
@@ -252,7 +275,7 @@ const crawler = new PlaywrightCrawler({
             }
 
             if (!nextLink) {
-                console.log('  No next page link — done.');
+                console.log('  No next page link — done with this zone.');
                 break;
             }
 
@@ -280,15 +303,15 @@ const crawler = new PlaywrightCrawler({
                 }
             }
             if (!changed) {
-                console.log('  Page did not change — done.');
+                console.log('  Page did not change — done with this zone.');
                 break;
             }
             await sleep(3000);
         }
 
-        console.log('\nDone!');
+        console.log(`\nZone ${zoneIndex}/${totalZones} done!`);
     },
 });
 
-await crawler.run([{ url: startUrl }]);
+await crawler.run(startUrls);
 await Actor.exit();
