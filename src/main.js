@@ -164,13 +164,12 @@ const crawler = new PlaywrightCrawler({
                     const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
 
-                    // Step 1: load listing page to establish session
-                    await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-                    await sleep(2000);
-
-                    // Step 2: navigate to modal
-                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
-                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 15000 }).catch(() => {});
+                    // Always two-step: load listing first to establish session, then modal
+                    // Use shorter timeouts so slow proxies fail fast rather than hanging
+                    await tab.goto(listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    await sleep(1500);
+                    await tab.goto(modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 12000 }).catch(() => {});
                     await sleep(2000);
 
                     const tabTitle = await tab.title();
