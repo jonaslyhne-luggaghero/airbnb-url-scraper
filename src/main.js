@@ -90,15 +90,13 @@ const CITY_PROXY_COUNTRIES = {
 // Each zone covers a different neighbourhood, giving its own 15 pages of unique listings
 const CITY_ZONES = {
     'Paris': [
-        { ne_lat: 48.895, ne_lng: 2.370, sw_lat: 48.850, sw_lng: 2.290 }, // 8,9,17,18 arr
-        { ne_lat: 48.895, ne_lng: 2.410, sw_lat: 48.850, sw_lng: 2.330 }, // 10,19 arr
-        { ne_lat: 48.895, ne_lng: 2.470, sw_lat: 48.850, sw_lng: 2.390 }, // 20,11 arr
-        { ne_lat: 48.855, ne_lng: 2.370, sw_lat: 48.820, sw_lng: 2.290 }, // 6,7,15 arr
-        { ne_lat: 48.855, ne_lng: 2.410, sw_lat: 48.820, sw_lng: 2.330 }, // 1,2,3,4 arr
-        { ne_lat: 48.855, ne_lng: 2.470, sw_lat: 48.820, sw_lng: 2.390 }, // 12,13 arr
-        { ne_lat: 48.820, ne_lng: 2.410, sw_lat: 48.790, sw_lng: 2.290 }, // 14,15 arr
-        { ne_lat: 48.820, ne_lng: 2.470, sw_lat: 48.790, sw_lng: 2.330 }, // suburbs SE
-        { ne_lat: 48.950, ne_lng: 2.470, sw_lat: 48.895, sw_lng: 2.220 }, // suburbs N
+        { ne_lat: 48.950, ne_lng: 2.420, sw_lat: 48.880, sw_lng: 2.290 }, // NW: 16,17,8 arr
+        { ne_lat: 48.950, ne_lng: 2.470, sw_lat: 48.880, sw_lng: 2.350 }, // NE: 18,19,10 arr
+        { ne_lat: 48.880, ne_lng: 2.390, sw_lat: 48.830, sw_lng: 2.280 }, // W center: 7,15,6 arr
+        { ne_lat: 48.880, ne_lng: 2.430, sw_lat: 48.830, sw_lng: 2.330 }, // Center: 1,2,3,4,9 arr
+        { ne_lat: 48.880, ne_lng: 2.470, sw_lat: 48.830, sw_lng: 2.380 }, // E center: 11,20 arr
+        { ne_lat: 48.830, ne_lng: 2.420, sw_lat: 48.790, sw_lng: 2.280 }, // SW: 14,15 arr
+        { ne_lat: 48.830, ne_lng: 2.470, sw_lat: 48.790, sw_lng: 2.350 }, // SE: 12,13 arr
     ],
 };
 
