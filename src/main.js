@@ -86,115 +86,63 @@ const CITY_PROXY_COUNTRIES = {
     'Tallinn': 'EE', 'Vilnius': 'LT',
 };
 
-// Multi-zone definitions based on actual tourist/rental hotspot research per city.
-// Each zone targets a known high-density Airbnb neighbourhood so pages are not wasted on empty suburbs.
 const CITY_ZONES = {
-
-    // PARIS — 7 arrondissement clusters (unchanged, already working well)
     'Paris': [
-        { ne_lat: 48.950, ne_lng: 2.420, sw_lat: 48.880, sw_lng: 2.290 }, // NW: 16,17,8 arr
-        { ne_lat: 48.950, ne_lng: 2.470, sw_lat: 48.880, sw_lng: 2.350 }, // NE: 18,19,10 arr
-        { ne_lat: 48.880, ne_lng: 2.390, sw_lat: 48.830, sw_lng: 2.280 }, // W center: 7,15,6 arr
-        { ne_lat: 48.880, ne_lng: 2.430, sw_lat: 48.830, sw_lng: 2.330 }, // Center: 1,2,3,4,9 arr
-        { ne_lat: 48.880, ne_lng: 2.470, sw_lat: 48.830, sw_lng: 2.380 }, // E center: 11,20 arr
-        { ne_lat: 48.830, ne_lng: 2.420, sw_lat: 48.790, sw_lng: 2.280 }, // SW: 14,15 arr
-        { ne_lat: 48.830, ne_lng: 2.470, sw_lat: 48.790, sw_lng: 2.350 }, // SE: 12,13 arr
+        { ne_lat: 48.950, ne_lng: 2.420, sw_lat: 48.880, sw_lng: 2.290 },
+        { ne_lat: 48.950, ne_lng: 2.470, sw_lat: 48.880, sw_lng: 2.350 },
+        { ne_lat: 48.880, ne_lng: 2.390, sw_lat: 48.830, sw_lng: 2.280 },
+        { ne_lat: 48.880, ne_lng: 2.430, sw_lat: 48.830, sw_lng: 2.330 },
+        { ne_lat: 48.880, ne_lng: 2.470, sw_lat: 48.830, sw_lng: 2.380 },
+        { ne_lat: 48.830, ne_lng: 2.420, sw_lat: 48.790, sw_lng: 2.280 },
+        { ne_lat: 48.830, ne_lng: 2.470, sw_lat: 48.790, sw_lng: 2.350 },
     ],
-
-    // BARCELONA — 6 zones based on the real Airbnb hotspot neighbourhoods:
-    // Eixample Dreta (Sagrada Família, Passeig de Gràcia, Casa Batlló) — most popular
-    // Eixample Esquerra (Sant Antoni, Urgell) — trendy, growing
-    // Ciutat Vella: Gothic Quarter + El Raval + Las Ramblas — most touristy
-    // El Born + Barceloneta — medieval streets + beach, very high density
-    // Gràcia + Parc Güell — bohemian village vibe, popular with longer stays
-    // Poble Sec + Montjuïc + Sants — up-and-coming, good value rentals
     'Barcelona': [
-        { ne_lat: 41.415, ne_lng: 2.185, sw_lat: 41.375, sw_lng: 2.148 }, // Eixample Dreta: Sagrada Família, Passeig de Gràcia
-        { ne_lat: 41.395, ne_lng: 2.165, sw_lat: 41.365, sw_lng: 2.130 }, // Eixample Esquerra: Sant Antoni, Urgell
-        { ne_lat: 41.385, ne_lng: 2.180, sw_lat: 41.355, sw_lng: 2.155 }, // Ciutat Vella: Gothic Quarter, El Raval, Las Ramblas
-        { ne_lat: 41.395, ne_lng: 2.200, sw_lat: 41.370, sw_lng: 2.175 }, // El Born + Barceloneta beach
-        { ne_lat: 41.430, ne_lng: 2.170, sw_lat: 41.400, sw_lng: 2.140 }, // Gràcia + Parc Güell
-        { ne_lat: 41.380, ne_lng: 2.160, sw_lat: 41.345, sw_lng: 2.120 }, // Poble Sec + Montjuïc + Sants
+        { ne_lat: 41.415, ne_lng: 2.185, sw_lat: 41.375, sw_lng: 2.148 },
+        { ne_lat: 41.395, ne_lng: 2.165, sw_lat: 41.365, sw_lng: 2.130 },
+        { ne_lat: 41.385, ne_lng: 2.180, sw_lat: 41.355, sw_lng: 2.155 },
+        { ne_lat: 41.395, ne_lng: 2.200, sw_lat: 41.370, sw_lng: 2.175 },
+        { ne_lat: 41.430, ne_lng: 2.170, sw_lat: 41.400, sw_lng: 2.140 },
+        { ne_lat: 41.380, ne_lng: 2.160, sw_lat: 41.345, sw_lng: 2.120 },
     ],
-
-    // ROME — 6 zones based on the real Airbnb hotspot neighbourhoods:
-    // Centro Storico (Pantheon, Piazza Navona, Campo de' Fiori, Trevi) — most touristy
-    // Prati + Vatican (St Peter's, Vatican Museums) — very high rental density
-    // Monti + Colosseo + Termini — trendiest local neighbourhood + ancient ruins
-    // Trastevere — most popular authentic neighbourhood, huge Airbnb density
-    // Testaccio + Aventino — foodie hub, up-and-coming rentals
-    // Piazza di Spagna + Villa Borghese + Parioli — luxury end of market
     'Rome': [
-        { ne_lat: 41.905, ne_lng: 12.480, sw_lat: 41.885, sw_lng: 12.460 }, // Centro Storico: Pantheon, Navona, Trevi
-        { ne_lat: 41.915, ne_lng: 12.470, sw_lat: 41.895, sw_lng: 12.445 }, // Prati + Vatican
-        { ne_lat: 41.900, ne_lng: 12.510, sw_lat: 41.880, sw_lng: 12.480 }, // Monti + Colosseo + Termini
-        { ne_lat: 41.890, ne_lng: 12.475, sw_lat: 41.870, sw_lng: 12.450 }, // Trastevere
-        { ne_lat: 41.880, ne_lng: 12.490, sw_lat: 41.855, sw_lng: 12.460 }, // Testaccio + Aventino
-        { ne_lat: 41.920, ne_lng: 12.500, sw_lat: 41.898, sw_lng: 12.470 }, // Piazza di Spagna + Borghese + Parioli
+        { ne_lat: 41.905, ne_lng: 12.480, sw_lat: 41.885, sw_lng: 12.460 },
+        { ne_lat: 41.915, ne_lng: 12.470, sw_lat: 41.895, sw_lng: 12.445 },
+        { ne_lat: 41.900, ne_lng: 12.510, sw_lat: 41.880, sw_lng: 12.480 },
+        { ne_lat: 41.890, ne_lng: 12.475, sw_lat: 41.870, sw_lng: 12.450 },
+        { ne_lat: 41.880, ne_lng: 12.490, sw_lat: 41.855, sw_lng: 12.460 },
+        { ne_lat: 41.920, ne_lng: 12.500, sw_lat: 41.898, sw_lng: 12.470 },
     ],
-
-    // BERLIN — 5 zones based on the real Airbnb hotspot neighbourhoods:
-    // Mitte (historic centre, Museum Island, Alexanderplatz, Hackescher Markt)
-    // Prenzlauer Berg (young, trendy, highest Airbnb density in Berlin)
-    // Friedrichshain + Kreuzberg (nightlife, alternative scene, very popular)
-    // Charlottenburg + Wilmersdorf (upmarket west, Kurfürstendamm shopping)
-    // Schöneberg + Tempelhof (LGBTQ+ hub, local neighbourhood feel)
     'Berlin': [
-        { ne_lat: 52.530, ne_lng: 13.420, sw_lat: 52.505, sw_lng: 13.380 }, // Mitte: Museum Island, Alexanderplatz
-        { ne_lat: 52.545, ne_lng: 13.440, sw_lat: 52.520, sw_lng: 13.405 }, // Prenzlauer Berg: highest density
-        { ne_lat: 52.515, ne_lng: 13.470, sw_lat: 52.490, sw_lng: 13.430 }, // Friedrichshain + Kreuzberg
-        { ne_lat: 52.510, ne_lng: 13.340, sw_lat: 52.485, sw_lng: 13.300 }, // Charlottenburg + Wilmersdorf
-        { ne_lat: 52.490, ne_lng: 13.380, sw_lat: 52.465, sw_lng: 13.340 }, // Schöneberg + Tempelhof
+        { ne_lat: 52.530, ne_lng: 13.420, sw_lat: 52.505, sw_lng: 13.380 },
+        { ne_lat: 52.545, ne_lng: 13.440, sw_lat: 52.520, sw_lng: 13.405 },
+        { ne_lat: 52.515, ne_lng: 13.470, sw_lat: 52.490, sw_lng: 13.430 },
+        { ne_lat: 52.510, ne_lng: 13.340, sw_lat: 52.485, sw_lng: 13.300 },
+        { ne_lat: 52.490, ne_lng: 13.380, sw_lat: 52.465, sw_lng: 13.340 },
     ],
-
-    // AMSTERDAM — 4 zones based on the real Airbnb hotspot neighbourhoods:
-    // Canal Ring + Jordaan (most iconic, highest density, UNESCO heritage)
-    // De Pijp (Albert Cuyp market, trendy, very popular with tourists)
-    // Centrum East: Plantage, Waterlooplein, Nieuwmarkt
-    // Oud-West + Vondelpark (upmarket residential, strong rental market)
     'Amsterdam': [
-        { ne_lat: 52.380, ne_lng: 4.900, sw_lat: 52.360, sw_lng: 4.870 }, // Canal Ring + Jordaan
-        { ne_lat: 52.358, ne_lng: 4.910, sw_lat: 52.340, sw_lng: 4.885 }, // De Pijp: Albert Cuyp market
-        { ne_lat: 52.375, ne_lng: 4.925, sw_lat: 52.358, sw_lng: 4.898 }, // Centrum East: Plantage, Nieuwmarkt
-        { ne_lat: 52.370, ne_lng: 4.878, sw_lat: 52.350, sw_lng: 4.848 }, // Oud-West + Vondelpark
+        { ne_lat: 52.380, ne_lng: 4.900, sw_lat: 52.360, sw_lng: 4.870 },
+        { ne_lat: 52.358, ne_lng: 4.910, sw_lat: 52.340, sw_lng: 4.885 },
+        { ne_lat: 52.375, ne_lng: 4.925, sw_lat: 52.358, sw_lng: 4.898 },
+        { ne_lat: 52.370, ne_lng: 4.878, sw_lat: 52.350, sw_lng: 4.848 },
     ],
-
-    // MADRID — 5 zones based on the real Airbnb hotspot neighbourhoods:
-    // Centro: Sol, Gran Vía, Puerta del Sol — most touristy, highest density
-    // Malasaña + Chueca — trendy, LGBTQ+, nightlife, very popular on Airbnb
-    // La Latina + Lavapiés — tapas bars, authentic local vibe, up-and-coming
-    // Salamanca — upmarket, luxury rentals, Serrano shopping
-    // Retiro + Atocha — Prado museum, park, cultural hub
     'Madrid': [
-        { ne_lat: 40.425, ne_lng: -3.695, sw_lat: 40.410, sw_lng: -3.715 }, // Centro: Sol, Gran Vía
-        { ne_lat: 40.430, ne_lng: -3.695, sw_lat: 40.418, sw_lng: -3.710 }, // Malasaña + Chueca
-        { ne_lat: 40.415, ne_lng: -3.705, sw_lat: 40.400, sw_lng: -3.720 }, // La Latina + Lavapiés
-        { ne_lat: 40.430, ne_lng: -3.675, sw_lat: 40.415, sw_lng: -3.695 }, // Salamanca
-        { ne_lat: 40.415, ne_lng: -3.680, sw_lat: 40.398, sw_lng: -3.700 }, // Retiro + Atocha
+        { ne_lat: 40.425, ne_lng: -3.695, sw_lat: 40.410, sw_lng: -3.715 },
+        { ne_lat: 40.430, ne_lng: -3.695, sw_lat: 40.418, sw_lng: -3.710 },
+        { ne_lat: 40.415, ne_lng: -3.705, sw_lat: 40.400, sw_lng: -3.720 },
+        { ne_lat: 40.430, ne_lng: -3.675, sw_lat: 40.415, sw_lng: -3.695 },
+        { ne_lat: 40.415, ne_lng: -3.680, sw_lat: 40.398, sw_lng: -3.700 },
     ],
-
-    // MILAN — 4 zones based on the real Airbnb hotspot neighbourhoods:
-    // Centro + Duomo (cathedral, Galleria Vittorio Emanuele, luxury shopping)
-    // Brera + Moscova (art quarter, most desirable neighbourhood)
-    // Navigli + Isola (canal nightlife, up-and-coming, popular on Airbnb)
-    // Porta Venezia + Buenos Aires (multicultural, lots of mid-range rentals)
     'Milan': [
-        { ne_lat: 45.470, ne_lng: 9.200, sw_lat: 45.455, sw_lng: 9.180 }, // Centro + Duomo
-        { ne_lat: 45.480, ne_lng: 9.195, sw_lat: 45.465, sw_lng: 9.173 }, // Brera + Moscova
-        { ne_lat: 45.460, ne_lng: 9.190, sw_lat: 45.440, sw_lng: 9.165 }, // Navigli + Isola
-        { ne_lat: 45.475, ne_lng: 9.215, sw_lat: 45.460, sw_lng: 9.195 }, // Porta Venezia + Buenos Aires
+        { ne_lat: 45.470, ne_lng: 9.200, sw_lat: 45.455, sw_lng: 9.180 },
+        { ne_lat: 45.480, ne_lng: 9.195, sw_lat: 45.465, sw_lng: 9.173 },
+        { ne_lat: 45.460, ne_lng: 9.190, sw_lat: 45.440, sw_lng: 9.165 },
+        { ne_lat: 45.475, ne_lng: 9.215, sw_lat: 45.460, sw_lng: 9.195 },
     ],
-
-    // LISBON — 4 zones based on the real Airbnb hotspot neighbourhoods:
-    // Alfama + Mouraria (oldest neighbourhoods, most iconic, very high density)
-    // Chiado + Bairro Alto (trendy, restaurants, nightlife hub)
-    // Baixa + Rossio (historic centre, most central, tourist ground zero)
-    // Príncipe Real + Santos + Estrela (upmarket, boutique rentals)
     'Lisbon': [
-        { ne_lat: 38.718, ne_lng: -9.123, sw_lat: 38.706, sw_lng: -9.138 }, // Alfama + Mouraria
-        { ne_lat: 38.713, ne_lng: -9.138, sw_lat: 38.703, sw_lng: -9.152 }, // Chiado + Bairro Alto
-        { ne_lat: 38.718, ne_lng: -9.135, sw_lat: 38.710, sw_lng: -9.148 }, // Baixa + Rossio
-        { ne_lat: 38.720, ne_lng: -9.148, sw_lat: 38.708, sw_lng: -9.162 }, // Príncipe Real + Santos
+        { ne_lat: 38.718, ne_lng: -9.123, sw_lat: 38.706, sw_lng: -9.138 },
+        { ne_lat: 38.713, ne_lng: -9.138, sw_lat: 38.703, sw_lng: -9.152 },
+        { ne_lat: 38.718, ne_lng: -9.135, sw_lat: 38.710, sw_lng: -9.148 },
+        { ne_lat: 38.720, ne_lng: -9.148, sw_lat: 38.708, sw_lng: -9.162 },
     ],
 };
 
@@ -217,7 +165,7 @@ const startUrls = zones.map((z, i) => ({
     userData: { zoneIndex: i + 1, totalZones: zones.length },
 }));
 
-// Helper: navigate to a URL with 1 automatic retry on timeout
+// Helper: navigate with 1 automatic retry on timeout
 async function gotoWithRetry(tab, url, options, retries = 1) {
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
@@ -232,6 +180,70 @@ async function gotoWithRetry(tab, url, options, retries = 1) {
             }
         }
     }
+}
+
+// FIX 1: Extract fields from modal text handling BOTH formats:
+//   Format A (inline):  "Business name: ACME SRL"
+//   Format B (newline): "Business name:\nACME SRL"
+function extractFields(modalText) {
+    let companyName = null, email = null, phone = null, address = null, registrationNumber = null;
+
+    const lines = modalText.split('\n').map(l => l.trim()).filter(Boolean);
+
+    // Known labels mapped to field names — order matters, check longer labels first
+    const labelMap = [
+        { keys: ['business name', 'company name', 'bedrijfsnaam', 'firmanavn', 'raison sociale', 'nom commercial', 'ragione sociale', 'denominazione'], field: 'companyName' },
+        { keys: ['business registration number', 'registration number', 'company registration', 'kvk', 'cvr', 'rcs', 'vat number', 'siren', 'siret', 'handelsregister', 'partita iva', 'codice fiscale', 'numero di iscrizione'], field: 'registrationNumber' },
+        { keys: ['email', 'e-mail', 'courriel', 'e-mailadres', 'posta elettronica'], field: 'email' },
+        { keys: ['phone', 'phone number', 'telefon', 'téléphone', 'tél', 'mobile', 'telefoonnummer', 'telefono', 'numero di telefono'], field: 'phone' },
+        { keys: ['address', 'adresse', 'adres', 'indirizzo'], field: 'address' },
+    ];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const colonIdx = line.indexOf(':');
+
+        // Format A: "Label: Value" on same line
+        if (colonIdx !== -1) {
+            const label = line.substring(0, colonIdx).trim().toLowerCase();
+            const inlineValue = line.substring(colonIdx + 1).trim();
+
+            for (const { keys, field } of labelMap) {
+                if (keys.some(k => label.includes(k))) {
+                    if (inlineValue) {
+                        // Value is on the same line
+                        if (field === 'companyName' && !companyName) companyName = inlineValue;
+                        else if (field === 'registrationNumber' && !registrationNumber) registrationNumber = inlineValue;
+                        else if (field === 'email' && !email) email = inlineValue;
+                        else if (field === 'phone' && !phone) phone = inlineValue;
+                        else if (field === 'address' && !address) address = inlineValue;
+                    } else if (i + 1 < lines.length) {
+                        // Format B: Value is on the NEXT line
+                        const nextLine = lines[i + 1];
+                        // Make sure next line isn't itself a label
+                        const nextIsLabel = labelMap.some(({ keys: ks }) =>
+                            ks.some(k => nextLine.toLowerCase().includes(k + ':') || nextLine.toLowerCase().startsWith(k))
+                        );
+                        if (!nextIsLabel) {
+                            if (field === 'companyName' && !companyName) companyName = nextLine;
+                            else if (field === 'registrationNumber' && !registrationNumber) registrationNumber = nextLine;
+                            else if (field === 'email' && !email) email = nextLine;
+                            else if (field === 'phone' && !phone) phone = nextLine;
+                            else if (field === 'address' && !address) address = nextLine;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    return { companyName, email, phone, address, registrationNumber };
+}
+
+// FIX 2: Detect if the tab landed on the Airbnb homepage instead of the listing
+function isHomepage(text) {
+    return text.includes('Start your search') && text.includes('Check in / Check out') && !text.includes('Business name');
 }
 
 const crawler = new PlaywrightCrawler({
@@ -301,66 +313,73 @@ const crawler = new PlaywrightCrawler({
                     const domain = page.url().match(/https:\/\/[^\/]+/)?.[0] || 'https://www.airbnb.com';
                     const modalUrl = `${domain}/rooms/${listingUrl.split('/rooms/')[1]}?modal=PROFESSIONAL_HOST_DETAILS`;
 
-                    // Two-step: load listing first to establish session, then modal
+                    // Step 1: load listing to establish session
                     await gotoWithRetry(tab, listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-                    await sleep(1500);
-                    await gotoWithRetry(tab, modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-                    await tab.waitForSelector('[role="dialog"], [data-testid="modal-container"]', { timeout: 12000 }).catch(() => {});
                     await sleep(2000);
+
+                    // Step 2: navigate to modal URL
+                    await gotoWithRetry(tab, modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+                    // FIX 2: Wait longer for modal — up to 20s, checking every second
+                    let modalText = '';
+                    for (let attempt = 0; attempt < 20; attempt++) {
+                        await sleep(1000);
+                        const bodyText = await tab.evaluate(() => document.body.innerText || '');
+                        if (bodyText.includes('Business name') || bodyText.includes('business name') ||
+                            bodyText.includes('Ragione sociale') || bodyText.includes('ragione sociale')) {
+                            modalText = bodyText;
+                            break;
+                        }
+                        // If we got the homepage, bail early — no point waiting
+                        if (isHomepage(bodyText)) {
+                            console.log(`    ↩️ Redirected to homepage, skipping`);
+                            break;
+                        }
+                    }
+
+                    // If polling didn't find modal text, try dialog selectors as fallback
+                    if (!modalText) {
+                        const selectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
+                        for (const sel of selectors) {
+                            try {
+                                const el = await tab.$(sel);
+                                if (el) {
+                                    const text = await tab.evaluate(el => el.innerText || '', el);
+                                    if (text.length > 50) { modalText = text; break; }
+                                }
+                            } catch (e) {}
+                        }
+                    }
 
                     const tabTitle = await tab.title();
                     console.log(`    Tab: ${tabTitle.substring(0, 60)}`);
 
-                    let modalText = '';
-                    const selectors = ['[role="dialog"]', '[data-testid="modal-container"]', '[aria-modal="true"]'];
-                    for (const sel of selectors) {
-                        try {
-                            const el = await tab.$(sel);
-                            if (el) {
-                                modalText = await tab.evaluate(el => el.innerText || '', el);
-                                if (modalText.length > 50) break;
-                            }
-                        } catch (e) {}
-                    }
-                    if (!modalText || modalText.length < 50) {
-                        modalText = await tab.evaluate(() => document.body.innerText || '');
-                    }
-
-                    let companyName = null, email = null, phone = null, address = null, registrationNumber = null;
-                    const lines = modalText.split('\n').map(l => l.trim()).filter(Boolean);
-                    for (const line of lines) {
-                        const colonIdx = line.indexOf(':');
-                        if (colonIdx === -1) continue;
-                        const label = line.substring(0, colonIdx).trim().toLowerCase();
-                        const value = line.substring(colonIdx + 1).trim();
-                        if (!value) continue;
-                        if (label.includes('business name') || label.includes('company') || label.includes('bedrijfsnaam') || label.includes('firmanavn') || label.includes('raison sociale') || label.includes('nom commercial')) companyName = value;
-                        else if (label.includes('registration') || label.includes('kvk') || label.includes('cvr') || label.includes('rcs') || label.includes('vat') || label.includes('siren') || label.includes('siret') || label.includes('handelsregister')) registrationNumber = value;
-                        else if (label.includes('email') || label === 'e-mail' || label === 'courriel' || label === 'e-mailadres') email = value;
-                        else if (label.includes('phone') || label === 'telefon' || label === 'téléphone' || label === 'tél' || label.includes('mobile') || label === 'telefoonnummer') phone = value;
-                        else if (label === 'address' || label === 'adresse' || label === 'adres') address = value;
-                    }
-
-                    const pageText = await tab.evaluate(() => document.body.innerText || '');
-                    const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*[\d,]+\s*review/i)
-                        || pageText.match(/Rated\s+([\d.]+)\s+out of 5/i)
-                        || pageText.match(/(\d\.\d{1,2})\s*★/);
-                    const starRating = ratingMatch ? parseFloat(ratingMatch[1]) : null;
-                    const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*([\d,]+)\s*review/i)
-                        || pageText.match(/([\d,]+)\s+reviews?/i);
-                    const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/,/g, '')) : null;
-
-                    if ((companyName || email || phone) && !seenCompanies.has(email || companyName)) {
-                        seenCompanies.add(email || companyName);
-                        console.log(`    ✅ ${companyName} | ${email} | ${phone}`);
-                        await Actor.pushData({
-                            url: listingUrl, city, companyName, email, phone,
-                            address, registrationNumber, starRating, reviewCount,
-                            isBusinessHost: true, scrapedAt: new Date().toISOString(),
-                        });
+                    if (!modalText || isHomepage(modalText)) {
+                        console.log(`    ⚠️ No details extracted (modal did not load)`);
                     } else {
-              console.log(`    ⚠️ No details extracted`);
-console.log(`    DEBUG modalText (first 300 chars): ${modalText.substring(0, 300)}`);
+                        // FIX 1: use improved extractor handling both inline and newline formats
+                        const { companyName, email, phone, address, registrationNumber } = extractFields(modalText);
+
+                        const pageText = await tab.evaluate(() => document.body.innerText || '');
+                        const ratingMatch = pageText.match(/(\d\.\d{1,2})\s*[·•]\s*[\d,]+\s*review/i)
+                            || pageText.match(/Rated\s+([\d.]+)\s+out of 5/i)
+                            || pageText.match(/(\d\.\d{1,2})\s*★/);
+                        const starRating = ratingMatch ? parseFloat(ratingMatch[1]) : null;
+                        const reviewMatch = pageText.match(/[\d.]+\s*[·•]\s*([\d,]+)\s*review/i)
+                            || pageText.match(/([\d,]+)\s+reviews?/i);
+                        const reviewCount = reviewMatch ? parseInt(reviewMatch[1].replace(/,/g, '')) : null;
+
+                        if ((companyName || email || phone) && !seenCompanies.has(email || companyName)) {
+                            seenCompanies.add(email || companyName);
+                            console.log(`    ✅ ${companyName} | ${email} | ${phone}`);
+                            await Actor.pushData({
+                                url: listingUrl, city, companyName, email, phone,
+                                address, registrationNumber, starRating, reviewCount,
+                                isBusinessHost: true, scrapedAt: new Date().toISOString(),
+                            });
+                        } else {
+                            console.log(`    ⚠️ No details extracted (fields not matched)`);
+                        }
                     }
                 } catch (err) {
                     console.log(`    ❌ Error: ${err.message.substring(0, 100)}`);
