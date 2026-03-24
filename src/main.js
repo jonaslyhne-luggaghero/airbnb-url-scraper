@@ -317,6 +317,15 @@ const crawler = new PlaywrightCrawler({
                     await gotoWithRetry(tab, listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
                     await sleep(4000);
 
+                    // If step 1 redirected away from the listing, wait and retry once
+                    const step1Url = tab.url();
+                    if (!step1Url.includes('/rooms/')) {
+                        console.log(`    ↩️ Step 1 redirected, retrying listing load...`);
+                        await sleep(3000);
+                        await gotoWithRetry(tab, listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                        await sleep(4000);
+                    }
+
                     // Step 2: navigate to modal URL
                     await gotoWithRetry(tab, modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
