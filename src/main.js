@@ -315,7 +315,7 @@ const crawler = new PlaywrightCrawler({
 
                     // Step 1: load listing to establish session
                     await gotoWithRetry(tab, listingUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-                    await sleep(2000);
+                    await sleep(4000);
 
                     // Step 2: navigate to modal URL
                     await gotoWithRetry(tab, modalUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
