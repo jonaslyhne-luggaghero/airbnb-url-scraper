@@ -359,7 +359,8 @@ const crawler = new PlaywrightCrawler({
                             isBusinessHost: true, scrapedAt: new Date().toISOString(),
                         });
                     } else {
-                        console.log(`    ⚠️ No details extracted`);
+              console.log(`    ⚠️ No details extracted`);
+console.log(`    DEBUG modalText (first 300 chars): ${modalText.substring(0, 300)}`);
                     }
                 } catch (err) {
                     console.log(`    ❌ Error: ${err.message.substring(0, 100)}`);
