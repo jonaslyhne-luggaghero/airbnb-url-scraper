@@ -192,11 +192,160 @@ function extractFields(modalText) {
 
     // Known labels mapped to field names — order matters, check longer labels first
     const labelMap = [
-        { keys: ['business name', 'company name', 'bedrijfsnaam', 'firmanavn', 'raison sociale', 'nom commercial', 'ragione sociale', 'denominazione'], field: 'companyName' },
-        { keys: ['business registration number', 'registration number', 'company registration', 'kvk', 'cvr', 'rcs', 'vat number', 'siren', 'siret', 'handelsregister', 'partita iva', 'codice fiscale', 'numero di iscrizione'], field: 'registrationNumber' },
-        { keys: ['email', 'e-mail', 'courriel', 'e-mailadres', 'posta elettronica'], field: 'email' },
-        { keys: ['phone', 'phone number', 'telefon', 'téléphone', 'tél', 'mobile', 'telefoonnummer', 'telefono', 'numero di telefono'], field: 'phone' },
-        { keys: ['address', 'adresse', 'adres', 'indirizzo'], field: 'address' },
+        { keys: [
+            // English
+            'business name', 'company name',
+            // French
+            'raison sociale', 'nom commercial',
+            // Italian
+            'ragione sociale', 'denominazione',
+            // Spanish
+            'nombre de la empresa', 'nombre comercial', 'razón social',
+            // German
+            'firmenname', 'unternehmensname', 'firma',
+            // Dutch
+            'bedrijfsnaam',
+            // Portuguese
+            'nome da empresa', 'nome comercial',
+            // Danish/Norwegian
+            'firmanavn', 'virksomhedsnavn',
+            // Swedish
+            'företagsnamn',
+            // Finnish
+            'yrityksen nimi',
+            // Polish
+            'nazwa firmy',
+            // Czech
+            'název společnosti',
+            // Hungarian
+            'cégnév',
+            // Greek
+            'επωνυμία',
+        ], field: 'companyName' },
+        { keys: [
+            // English
+            'business registration number', 'registration number', 'company registration',
+            // French
+            'rcs', 'siren', 'siret', 'numéro de siret', 'numéro rcs',
+            // Italian
+            'partita iva', 'codice fiscale', 'numero di iscrizione',
+            // Spanish
+            'cif', 'nif', 'número de registro', 'número de identificación fiscal',
+            // German
+            'handelsregisternummer', 'handelsregister', 'steuernummer', 'ust-id',
+            // Dutch
+            'kvk', 'btw',
+            // Portuguese
+            'nif', 'nipc', 'número de registo',
+            // Danish
+            'cvr',
+            // Swedish
+            'organisationsnummer',
+            // Norwegian
+            'organisasjonsnummer',
+            // Finnish
+            'y-tunnus',
+            // Polish
+            'nip', 'krs',
+            // Czech
+            'ič', 'ico',
+            // Hungarian
+            'adószám', 'cégjegyzékszám',
+            // Greek
+            'αφμ',
+            // Generic
+            'vat number', 'vat',
+        ], field: 'registrationNumber' },
+        { keys: [
+            // English/universal
+            'email', 'e-mail',
+            // French
+            'courriel',
+            // Italian
+            'posta elettronica',
+            // Spanish
+            'correo electrónico', 'correo',
+            // German
+            'e-mail-adresse',
+            // Dutch
+            'e-mailadres',
+            // Portuguese
+            'correio eletrónico',
+            // Swedish
+            'e-postadress',
+            // Norwegian/Danish
+            'e-postadresse',
+            // Finnish
+            'sähköposti',
+            // Polish
+            'adres e-mail',
+            // Czech
+            'e-mailová adresa',
+            // Hungarian
+            'e-mail cím',
+            // Greek
+            'ηλεκτρονικό ταχυδρομείο',
+        ], field: 'email' },
+        { keys: [
+            // English
+            'phone', 'phone number', 'mobile',
+            // French
+            'téléphone', 'tél', 'numéro de téléphone',
+            // Italian
+            'telefono', 'numero di telefono',
+            // Spanish
+            'teléfono', 'número de teléfono',
+            // German
+            'telefon', 'telefonnummer', 'handynummer',
+            // Dutch
+            'telefoonnummer',
+            // Portuguese
+            'telefone', 'número de telefone',
+            // Swedish
+            'telefonnummer',
+            // Norwegian/Danish
+            'telefonnummer',
+            // Finnish
+            'puhelinnumero',
+            // Polish
+            'numer telefonu',
+            // Czech
+            'telefonní číslo',
+            // Hungarian
+            'telefonszám',
+            // Greek
+            'τηλέφωνο',
+        ], field: 'phone' },
+        { keys: [
+            // English
+            'address',
+            // French
+            'adresse',
+            // Italian
+            'indirizzo',
+            // Spanish
+            'dirección',
+            // German
+            'adresse', 'anschrift',
+            // Dutch
+            'adres',
+            // Portuguese
+            'morada', 'endereço',
+            // Swedish
+            'adress',
+            // Norwegian/Danish
+            'adresse',
+            // Finnish
+            'osoite',
+            // Polish
+            'adres',
+            // Czech
+            'adresa',
+            // Hungarian
+            'cím',
+            // Greek
+            'διεύθυνση',
+        ], field: 'address' },
     ];
 
     for (let i = 0; i < lines.length; i++) {
