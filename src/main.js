@@ -40,6 +40,11 @@ const CITIES = {
     'Riga':         { ne_lat: 57.000, ne_lng: 24.180, sw_lat: 56.900, sw_lng: 24.040 },
     'Tallinn':      { ne_lat: 59.490, ne_lng: 24.820, sw_lat: 59.390, sw_lng: 24.680 },
     'Vilnius':      { ne_lat: 54.740, ne_lng: 25.350, sw_lat: 54.640, sw_lng: 25.210 },
+    'Porto':        { ne_lat: 41.180, ne_lng: -8.560, sw_lat: 41.130, sw_lng: -8.650 },
+    'Seville':      { ne_lat: 37.420, ne_lng: -5.950, sw_lat: 37.340, sw_lng: -6.020 },
+    'Florence':     { ne_lat: 43.800, ne_lng: 11.290, sw_lat: 43.750, sw_lng: 11.220 },
+    'Nice':         { ne_lat: 43.730, ne_lng: 7.310,  sw_lat: 43.680, sw_lng: 7.230  },
+    'Reykjavik':    { ne_lat: 64.160, ne_lng: -21.820, sw_lat: 64.110, sw_lng: -21.960 },
 };
 
 const CITY_URLS = {
@@ -73,6 +78,11 @@ const CITY_URLS = {
     'Riga':        'Riga--Latvia',
     'Tallinn':     'Tallinn--Estonia',
     'Vilnius':     'Vilnius--Lithuania',
+    'Porto':       'Porto--Portugal',
+    'Seville':     'Seville--Spain',
+    'Florence':    'Florence--Italy',
+    'Nice':        'Nice--France',
+    'Reykjavik':   'Reykjavik--Iceland',
 };
 
 const CITY_PROXY_COUNTRIES = {
@@ -84,6 +94,7 @@ const CITY_PROXY_COUNTRIES = {
     'Zurich': 'CH', 'Dublin': 'IE', 'Edinburgh': 'GB', 'Krakow': 'PL',
     'Lyon': 'FR', 'Zagreb': 'HR', 'Ljubljana': 'SI', 'Riga': 'LV',
     'Tallinn': 'EE', 'Vilnius': 'LT',
+    'Porto': 'PT', 'Seville': 'ES', 'Florence': 'IT', 'Nice': 'FR', 'Reykjavik': 'IS',
 };
 
 const CITY_ZONES = {
@@ -143,6 +154,35 @@ const CITY_ZONES = {
         { ne_lat: 38.713, ne_lng: -9.138, sw_lat: 38.703, sw_lng: -9.152 },
         { ne_lat: 38.718, ne_lng: -9.135, sw_lat: 38.710, sw_lng: -9.148 },
         { ne_lat: 38.720, ne_lng: -9.148, sw_lat: 38.708, sw_lng: -9.162 },
+    ],
+
+    // PORTO — 4 zones: Ribeira, Baixa+Sé, Cedofeita+Vitória, Bonfim
+    'Porto': [
+        { ne_lat: 41.145, ne_lng: -8.610, sw_lat: 41.135, sw_lng: -8.625 }, // Ribeira: riverfront, Dom Luís bridge
+        { ne_lat: 41.150, ne_lng: -8.605, sw_lat: 41.140, sw_lng: -8.620 }, // Baixa + Sé: Aliados, São Bento
+        { ne_lat: 41.158, ne_lng: -8.615, sw_lat: 41.147, sw_lng: -8.630 }, // Cedofeita + Vitória: arts, nightlife
+        { ne_lat: 41.150, ne_lng: -8.590, sw_lat: 41.138, sw_lng: -8.608 }, // Bonfim: local, up-and-coming
+    ],
+
+    // SEVILLE — 3 zones: Santa Cruz, Triana, El Arenal+Macarena
+    'Seville': [
+        { ne_lat: 37.395, ne_lng: -5.985, sw_lat: 37.378, sw_lng: -6.002 }, // Santa Cruz + El Centro: cathedral, Alcázar
+        { ne_lat: 37.390, ne_lng: -6.000, sw_lat: 37.373, sw_lng: -6.015 }, // Triana: authentic neighbourhood
+        { ne_lat: 37.408, ne_lng: -5.985, sw_lat: 37.392, sw_lng: -6.002 }, // El Arenal + Macarena
+    ],
+
+    // FLORENCE — 3 zones: Centro Storico, Oltrarno, Santa Croce
+    'Florence': [
+        { ne_lat: 43.775, ne_lng: 11.260, sw_lat: 43.765, sw_lng: 11.245 }, // Centro Storico: Duomo, Uffizi
+        { ne_lat: 43.765, ne_lng: 11.250, sw_lat: 43.755, sw_lng: 11.235 }, // Oltrarno: Pitti Palace, San Niccolò
+        { ne_lat: 43.773, ne_lng: 11.270, sw_lat: 43.763, sw_lng: 11.255 }, // Santa Croce + Sant'Ambrogio
+    ],
+
+    // NICE — 3 zones: Vieux-Nice, Promenade, Cimiez
+    'Nice': [
+        { ne_lat: 43.700, ne_lng: 7.285, sw_lat: 43.692, sw_lng: 7.272 }, // Vieux-Nice: old town
+        { ne_lat: 43.698, ne_lng: 7.270, sw_lat: 43.690, sw_lng: 7.255 }, // Promenade des Anglais + Centre
+        { ne_lat: 43.712, ne_lng: 7.270, sw_lat: 43.702, sw_lng: 7.255 }, // Cimiez + Libération
     ],
 };
 
