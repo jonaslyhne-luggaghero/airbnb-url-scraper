@@ -98,14 +98,17 @@ const CITY_PROXY_COUNTRIES = {
 };
 
 const CITY_ZONES = {
+    // PARIS — 8 tight zones targeting the real Airbnb business host hotspots:
+    // Old zones were too large and covered suburbs — these target the dense central arrondissements
     'Paris': [
-        { ne_lat: 48.950, ne_lng: 2.420, sw_lat: 48.880, sw_lng: 2.290 },
-        { ne_lat: 48.950, ne_lng: 2.470, sw_lat: 48.880, sw_lng: 2.350 },
-        { ne_lat: 48.880, ne_lng: 2.390, sw_lat: 48.830, sw_lng: 2.280 },
-        { ne_lat: 48.880, ne_lng: 2.430, sw_lat: 48.830, sw_lng: 2.330 },
-        { ne_lat: 48.880, ne_lng: 2.470, sw_lat: 48.830, sw_lng: 2.380 },
-        { ne_lat: 48.830, ne_lng: 2.420, sw_lat: 48.790, sw_lng: 2.280 },
-        { ne_lat: 48.830, ne_lng: 2.470, sw_lat: 48.790, sw_lng: 2.350 },
+        { ne_lat: 48.865, ne_lng: 2.365, sw_lat: 48.848, sw_lng: 2.338 }, // 1st+2nd: Louvre, Châtelet, Palais Royal
+        { ne_lat: 48.863, ne_lng: 2.365, sw_lat: 48.850, sw_lng: 2.348 }, // 3rd+4th: Le Marais, Pompidou
+        { ne_lat: 48.855, ne_lng: 2.352, sw_lat: 48.840, sw_lng: 2.328 }, // 5th+6th: Saint-Germain, Latin Quarter
+        { ne_lat: 48.865, ne_lng: 2.320, sw_lat: 48.845, sw_lng: 2.295 }, // 7th: Eiffel Tower, Left Bank
+        { ne_lat: 48.880, ne_lng: 2.325, sw_lat: 48.860, sw_lng: 2.295 }, // 8th: Champs-Élysées, Trocadéro
+        { ne_lat: 48.888, ne_lng: 2.350, sw_lat: 48.870, sw_lng: 2.325 }, // 9th+18th: Opéra, Montmartre, Pigalle
+        { ne_lat: 48.872, ne_lng: 2.380, sw_lat: 48.852, sw_lng: 2.352 }, // 10th+11th: Canal St-Martin, Bastille
+        { ne_lat: 48.855, ne_lng: 2.395, sw_lat: 48.835, sw_lng: 2.360 }, // 12th+13th: Nation, Bercy, Place d'Italie
     ],
     'Barcelona': [
         { ne_lat: 41.415, ne_lng: 2.185, sw_lat: 41.375, sw_lng: 2.148 },
